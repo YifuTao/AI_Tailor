@@ -134,18 +134,21 @@ def train_model(vis_title, device, model, dataloader, criterion, optimiser, sche
     import copy
     
     since = time.time()
-
-    pose_w=0.03
-    shape_w=0.05
-    ver_w=0.03
-    h_w=0.01
-    c_w=0.01
-    w_w=0.01
-    n_w=0.005
-    a_w=0.005
+    a = []
+    while len(a) != 8:
+        print('weights: pose shape ver h c w n a:')
+        a = [int(x) for x in raw_input().split()]
+    pose_w = a[0]
+    shape_w= a[1]
+    ver_w=a[2]
+    h_w=a[3]
+    c_w=a[4]
+    w_w=a[5]
+    n_w=a[6]
+    a_w=a[7]
     print('Parameter Weights')
-    print('Pose %.2f Shape %.2f Ver %.2f'%(pose_w,shape_w,ver_w))
-    print('Height %.2f Chest %.2f Waist %.2f Neck %.2f Arm %.2f'%(h_w,c_w,w_w,n_w,a_w))
+    print('Pose %.3f Shape %.3f Ver %.3f'%(pose_w,shape_w,ver_w))
+    print('Height %.3f Chest %.3f Waist %.3f Neck %.3f Arm %.3f'%(h_w,c_w,w_w,n_w,a_w))
     print('----------------------------------------------------')
 
     vis = visdom.Visdom()
