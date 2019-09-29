@@ -137,7 +137,7 @@ def train_model(vis_title, device, model, dataloader, criterion, optimiser, sche
     a = []
     while len(a) != 8:
         print('weights: pose shape ver h c w n a:')
-        a = [int(x) for x in raw_input().split()]
+        a = [float(x) for x in raw_input().split()]
     pose_w = a[0]
     shape_w= a[1]
     ver_w=a[2]
