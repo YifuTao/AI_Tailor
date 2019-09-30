@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
 import os
+from os.path import join
 import visdom
 import numpy as np
 
@@ -79,6 +80,12 @@ def parse_args():
         type=str,
         help="Gender ['male']"
     )
+    parser.add_argument(
+        "--save_path",
+        default='trained_model',
+        type=str,
+        help="save name of the trained model ['trained_model']"
+    )
     return parser.parse_args()
 
 
@@ -129,7 +136,7 @@ def myresnet50(device, num_output=79, use_pretrained=True, num_views=1):
     return model
 
 
-def train_model(vis_title, device, model, dataloader, criterion, optimiser, scheduler, args,):
+def train_model(parent_dic, save_name, vis_title, device, model, dataloader, criterion, optimiser, scheduler, args,):
     import time
     import copy
     
@@ -150,6 +157,14 @@ def train_model(vis_title, device, model, dataloader, criterion, optimiser, sche
     print('Pose %.3f Shape %.3f Ver %.3f'%(pose_w,shape_w,ver_w))
     print('Height %.3f Chest %.3f Waist %.3f Neck %.3f Arm %.3f'%(h_w,c_w,w_w,n_w,a_w))
     print('----------------------------------------------------')
+    record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'w+')
+    record.write('Gender:%s\n'%args.gender)
+    record.write('Dataset:%d\n'%args.dataset_size)
+    record.write('\nParameter Weights\n')
+    record.write('Pose %.3f Shape %.3f Ver %.3f\n'%(pose_w,shape_w,ver_w))
+    record.write('Height %.3f Chest %.3f Waist %.3f Neck %.3f Arm %.3f\n'%(h_w,c_w,w_w,n_w,a_w))
+    record.write('\n')
+    record.close()
 
     vis = visdom.Visdom()
     win_shape = vis.line(X=np.array([0]),Y=np.array([0]),opts=dict(
@@ -175,6 +190,10 @@ def train_model(vis_title, device, model, dataloader, criterion, optimiser, sche
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
+        record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'a')
+        record.write('\nEpoch {}/{}\n'.format(epoch, num_epochs - 1))
+        record.write('-' * 10+'\n')
+        record.close()
 
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
@@ -302,8 +321,14 @@ def train_model(vis_title, device, model, dataloader, criterion, optimiser, sche
 
             print('{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm{:.2f}cm H{:.2f}cm'.format(
                 phase[0], epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w, epoch_loss_n, epoch_loss_a,epoch_loss_h))
-            # print(' RMS:  Chest {:.4f}cm  Waist {:.4f}cm Neck {:.4F}cm  Arm {:.4f}cm '.format(
-            #     epoch_loss_c, epoch_loss_w, epoch_loss_n, epoch_loss_a))
+            #record.write("Hello \n") 
+            record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'a')
+            record.writelines(
+                '{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm{:.2f}cm H{:.2f}cm\n'.format(
+                phase[0], epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w, epoch_loss_n, epoch_loss_a,epoch_loss_h)
+            )
+            record.close()
+            
             vis.line(
                 X=np.array([epoch]),
                 Y=np.array([epoch_loss_shape]),
@@ -325,7 +350,6 @@ def train_model(vis_title, device, model, dataloader, criterion, optimiser, sche
                 win=win_pose_ver,
                 update='append'
             )
-            
             vis.line(
                 X=np.array([epoch]),
                 Y=np.array([epoch_loss_c]),
@@ -333,7 +357,6 @@ def train_model(vis_title, device, model, dataloader, criterion, optimiser, sche
                 win=win_cw,
                 update='append'
             )
-            
             vis.line(
                 X=np.array([epoch]),
                 Y=np.array([epoch_loss_w]),
@@ -356,11 +379,13 @@ def train_model(vis_title, device, model, dataloader, criterion, optimiser, sche
                 update='append'
             )
             
-
             # deep copy the model
             if phase == 'val' and epoch_loss < best_loss:
                 best_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
+            torch.save(best_model_wts, join(parent_dic,'trained_model', save_name+'_best.pth'))
+            if (epoch+1) % 5 == 0:
+                torch.save(best_model_wts, join(parent_dic,'trained_model', save_name+'_epoch_%d.pth'%epoch))
 
         print()
 
@@ -368,6 +393,7 @@ def train_model(vis_title, device, model, dataloader, criterion, optimiser, sche
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
     print('Best val Loss: {:4f}'.format(best_loss))
+
 
     # load best model weights
     model.load_state_dict(best_model_wts)
@@ -383,28 +409,32 @@ def main():
     print('Gender: ', args.gender)
     print('Dataset size: ', args.dataset_size)
     print('Batch size: ', args.batch_size)
-    print('Loss weight: Parameters:', args.par_loss_weight, '   |  Vertices:', 1 - args.par_loss_weight)
     parent_dic = "/home/yifu/workspace/data/synthetic/noise_free"
     print ('Data path: ', parent_dic)
     if os.path.exists(parent_dic)==False:
         print('Wrong data path!')
         exit()   
-    save_name = 'data:%d.pth' % args.dataset_size
-    save_path = os.path.join(parent_dic, save_name)
-    print('Save path: ', save_path)
-    if os.path.exists(save_path):
-        print('-----------------------------------------------------------')
+    if os.path.exists(join(parent_dic,'trained_model'))==False:
+        print('No trained_model folder in Data path!')
+        exit()
+    # save_name = 'data:%d.pth' % args.dataset_size
+    save_name = raw_input('Name of the model weights saved:')
+    save_path = os.path.join(parent_dic,'trained_model', save_name+'.pth')
+    
+    while os.path.exists(save_path):
         print('Network weights save path will overwrite existing pth file!')
-        if raw_input('Still proceed? (yes/no): ')!='yes':
-            print('terminated')
-            exit()
+        save_name = raw_input('Name of the model weights saved:')
+        save_path = os.path.join(parent_dic,'trained_model', save_name+'.pth')
+
+    print('-----------------------------------------------------------')
+    print('Save path: ', save_path)
 
     print('-----------------------------------------------------------')
     if raw_input('Confirm the above setting? (yes/no): ')!='yes':
         print('Terminated')
         exit()
     print('Training starts')
-    print('------------------------')
+    print('-----------------------------------------------------------')
 
     dataloader = load_data(args.dataset_size, parent_dic, args)
 
@@ -415,10 +445,8 @@ def main():
     exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=10, gamma=0.1)
 
     vis_title = save_name
-    model = train_model(vis_title, device, model, dataloader, criterion,
+    model = train_model(parent_dic, save_name, vis_title, device, model, dataloader, criterion,
                         optimiser, exp_lr_scheduler, args)
-
-    torch.save(model.state_dict(), save_path)
 
 
 if __name__ == "__main__":

@@ -76,7 +76,7 @@ def main():
     m = pickle.load(open('models/basicModel_%s_lbs_10_207_0_v1.0.0.pkl' % gender[0]))
     dataset_size = args.dataset_size
     print'Dataset range:', args.start_num, ' - ', dataset_size+args.start_num-1
-    parent_dic = '/home/yifu/workspace/data/synthetic/noise_free/val'
+    parent_dic = '/home/yifu/workspace/data/synthetic/noisy/train'
     print 'Data Path: ',parent_dic
     device = torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(device)
@@ -94,14 +94,34 @@ def main():
         poses = (torch.zeros(1,23,3)).cuda()   # joints
         variation = 3
         betas = (torch.rand(1,10) * variation*2 - variation).cuda()    # shapes
-        
+
         poses[0][17 - 1][2] = np.pi/4   # right shoulder joint
         poses[0][16 - 1][2] = - np.pi/4   # left shoulder joint
+        
+        variation = 0.3
+        poses[0][17 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
+        
+        poses[0][16 - 1][2] = - poses[0][17 - 1][2]
+        
+        variation = 0.15
+        poses[0][16 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
+
+        poses[0][1 - 1][2] = np.pi/40
+        variation = np.pi/40
+        poses[0][1 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
+        poses[0][2 - 1][2] = -np.pi/40
+        variation = np.pi/40
+        poses[0][2 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
+
+        variation = 0.03
+        for j in range(0,23):
+            for k in range(0,3):
+                poses[0][j][k] += torch.rand(1)[0] *variation*2 - variation
+        
 
         vertices = par_to_mesh(gender, rots, poses, betas)
         
         # rendering
-        
         vertices_num = 6890
         path = parent_dic
         batch = 1
