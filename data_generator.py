@@ -76,7 +76,7 @@ def main():
     m = pickle.load(open('models/basicModel_%s_lbs_10_207_0_v1.0.0.pkl' % gender[0]))
     dataset_size = args.dataset_size
     print'Dataset range:', args.start_num, ' - ', dataset_size+args.start_num-1
-    parent_dic = '/home/yifu/workspace/data/synthetic/noisy/train'
+    parent_dic = '/home/yifu/workspace/data/synthetic/noisy/val'
     print 'Data Path: ',parent_dic
     device = torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(device)

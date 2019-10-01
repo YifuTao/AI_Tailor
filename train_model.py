@@ -383,7 +383,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
             if phase == 'val' and epoch_loss < best_loss:
                 best_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
-            torch.save(best_model_wts, join(parent_dic,'trained_model', save_name+'_best.pth'))
+            torch.save(best_model_wts, join(parent_dic,'trained_model', save_name+'.pth'))
             if (epoch+1) % 5 == 0:
                 torch.save(best_model_wts, join(parent_dic,'trained_model', save_name+'_epoch_%d.pth'%epoch))
 
@@ -409,11 +409,11 @@ def main():
     print('Gender: ', args.gender)
     print('Dataset size: ', args.dataset_size)
     print('Batch size: ', args.batch_size)
-    parent_dic = "/home/yifu/workspace/data/synthetic/noise_free"
-    print ('Data path: ', parent_dic)
-    if os.path.exists(parent_dic)==False:
+    # parent_dic = "/home/yifu/workspace/data/synthetic/noise_free"
+    parent_dic = raw_input('Data Path:')
+    while os.path.exists(parent_dic)==False:
         print('Wrong data path!')
-        exit()   
+        parent_dic = raw_input('Data Path:')  
     if os.path.exists(join(parent_dic,'trained_model'))==False:
         print('No trained_model folder in Data path!')
         exit()
