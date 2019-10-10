@@ -1,5 +1,6 @@
 import torchvision
 import torch
+import numpy as np
 from train_model import myresnet50, load_data, parse_args
 from os.path import join
 import os
@@ -7,11 +8,11 @@ from PIL import Image
 from torchvision.transforms import ToTensor
 import csv
 import sys
-sys.path.append("/home/yifu/workspace/smpl")
-# from smpl_webuser.serialization import load_model
-# from calculate_circumference import get_measurements
+sys.path.append('functions')
+from render import mesh2Image, transpose_mesh, scale_mesh
 from body_measurements import vertex2measurements
 from SMPL_Pytorch import par_to_mesh, decompose_par
+from scale_mask import scale_fixed_height
 
 
 
@@ -50,10 +51,9 @@ def evaluate_model(model, num_views, path, device, args, normalise_scale=1,):
                 par_prd = model(inputs)
                 batch = par_prd.shape[0]
                 rots, poses, betas = decompose_par(par_prd)
+
                 mesh_prd = par_to_mesh(args.gender, rots, poses, betas)
 
-                par_gt = par_gt.float()  # from double to float
-                par_gt = par_gt.to(device)
                 X, Y, Z = [mesh_prd[:,:, 0], mesh_prd[:,:, 1], mesh_prd[:,:, 2]]
                 h_prd, w_prd, c_prd, n_prd, a_prd = vertex2measurements(X, Y, Z)
 
@@ -68,6 +68,39 @@ def evaluate_model(model, num_views, path, device, args, normalise_scale=1,):
                 csv_writer.writerow([i,'Neck',float(n_prd*ratio)])
                 csv_writer.writerow([i,'Arm',float(a_prd*ratio),])
                 csv_writer.writerow(['\n'])
+
+                # rendering
+                vertices_num = 6890
+                batch = 1
+                img_height = 264
+                img_width = 192 
+                # frontal view
+                vertices=mesh_prd
+                name = '%d_0_prd'%i
+                v = vertices.squeeze().to("cpu").numpy()
+                angle = np.pi
+                axis = np.array([0, 0, 1])
+                v = transpose_mesh(v, angle, axis)
+                angle = np.pi
+                axis = np.array([0, 1, 0])
+                v = transpose_mesh(v, angle, axis)
+                v_0 = scale_mesh(v, 400, 400, vertices_num=vertices_num)
+                mesh2Image(v_0, m['f'], batch, path, name, 400, 400, vertices_num=vertices_num)
+                image = Image.open(join(path,name+'.png'))
+                output = scale_fixed_height(image,img_height,img_width)
+                output_name = join(path, name+'.png')
+                output.save(output_name)
+                # side view
+                name = '%d_1_prd'%i
+                angle = np.pi/2
+                axis = np.array([0, -1, 0])
+                v = transpose_mesh(v, angle, axis)
+                v_1 = scale_mesh(v, 400, 400, vertices_num=vertices_num)
+                mesh2Image(v_1, m['f'], batch, path, name, 400, 400, vertices_num=vertices_num)
+                image = Image.open(join(path,name+'.png'))
+                output = scale_fixed_height(image,img_height,img_width)
+                output_name = join(path, name+'.png')
+                output.save(output_name)
                 # mesh generator
                 outmesh_path = join(path, '%d.obj'%i)
                 with open(outmesh_path, 'w') as fp:
@@ -93,13 +126,16 @@ def main():
                        use_pretrained=True, num_views=args.num_views)
     
     # folder: network weights
+    '''
     parent_dic = "/home/yifu/workspace/data/test/model_1"
     save_name = 'data:%d.pth' % (100000)
     path = os.path.join(parent_dic, save_name)
-    model.load_state_dict(torch.load(path))
+    '''
+    model_path = raw_input('Model Path:')
+    model.load_state_dict(torch.load(model_path, map_location=device))
     # folder: image 
-    path = "/home/yifu/workspace/data/test/model_1"
-    evaluate_model(model, args.num_views, path, device, args)
+    data_path = "/home/yifu/workspace/data/test/model_1"
+    evaluate_model(model, args.num_views, data_path, device, args)
 
 
 if __name__ == "__main__":
