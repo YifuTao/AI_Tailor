@@ -124,7 +124,7 @@ def myresnet50(device, num_output=79, use_pretrained=True, num_views=1):
     model = resnet_multi_view.resnet50(
         pretrained=use_pretrained, num_views=num_views)
     #model = torchvision.models.resnet50(pretrained=use_pretrained)
-    num_ftrs = model.fc.in_features * num_views
+    num_ftrs = model.fc.in_features # * num_views
 
     # print(num_ftrs)    # 2048 : features
     # print(model.fc.out_features)   #1000 resnet deafult: number of output classes
