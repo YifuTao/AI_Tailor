@@ -438,8 +438,9 @@ def main():
 
     dataloader = load_data(args.dataset_size, parent_dic, args)
 
+    iteration = int(raw_input('Number of iterations in the neuron network: '))
     model = myresnet50(device, num_output=args.num_output,
-                       use_pretrained=True, num_views=args.num_views)
+                       use_pretrained=True, num_views=args.num_views, num_iteration = iteration)
     criterion = nn.MSELoss()    # Mean suqared error for each element
     optimiser = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
     exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=10, gamma=0.1)
