@@ -122,7 +122,7 @@ class ResNet(nn.Module):
 
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None, num_views=1):
+                 norm_layer=None, num_views=1, num_iteration=1, num_output=82):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -154,7 +154,10 @@ class ResNet(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
         
-        self.num_views = num_views  # added
+        # added
+        self.num_views = num_views  
+        self.num_output = num_output
+        self.num_iteration = num_iteration
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -217,31 +220,45 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)  
         
-        # torch.Size([batch, 2048, 13, 13])
+        # torch.Size([batch, 2048, 9, 13])
 
         x = self.avgpool(x)
-        x = x.reshape(x.size(0), -1)
+        x = x.reshape(x.size(0), -1)  # torch.Size([num_views x batch, 2048])
         
-        # torch.Size([2 x batch, 2048])
-        
-        #print(x.size())        #[12,2048]
-        #print(x.size()[0])     #12 = 2 (num_views) x 6(real batch size)
-        #print(self.num_views)  #2
-        
-        parts = torch.chunk(x,self.num_views,0)  # parts[k] : torch.Size([6, 2048])
-        #print(len(x))  #num_views
+        parts = torch.chunk(x,self.num_views,0)  # parts[k] : torch.Size([batch, 2048])
+        '''
         x=torch.unsqueeze(parts[0], 2)
         for k in range(1,self.num_views):
             part = torch.unsqueeze(parts[k], 2)
             x = torch.cat((x,part),2)    # torch.Size([batch, 2048, num_views])
+        '''
+
+        # IEF Loop
+        batch = x.size()[0] / self.num_views
+        theta_prev = torch.zeros(batch, 82).cuda() # 82 SMPL Pamameter
+        # theta_prev[;, 51]=np.pi/4
+        # theta_prev[;, 54]=np.pi/4
+        theta = torch.FloatTensor([]).cuda()
+        for i in range(0, self.num_iteration):
+            theta_cat = torch.FloatTensor([]).cuda()
+            for j in range(0, self.num_views):
+                state = torch.cat((parts[j],theta_prev), 1)  # 2048 features + 82 SMPL Par 
+                delta_theta = self.mlp(state)
+                theta_tmp = torch.unsqueeze((theta_prev + delta_theta), 2)
+                theta_cat = torch.cat((theta_cat, theta_tmp),2)
+            theta_prev = self.pool(theta_cat)
+            theta = torch.cat((theta, theta_prev),2)
+            theta_prev = theta_prev.reshape(batch,-1)
+        
+        '''
         max_pool = nn.MaxPool1d(self.num_views)
         x = max_pool(x)
-        x = x.reshape(x.size(0), -1)
-        x = self.fc(x)  # [6,79] real batch size is 6
+        x = x.reshape(x.size(0), -1)    # size: batch x 2048
 
-        # torch.Size([batch, 79])
-
-        return x
+        x = self.fc(x)
+        # torch.Size([batch, 82])
+        '''
+        return theta
 
 
 def _resnet(arch, block, layers, pretrained, progress, **kwargs):

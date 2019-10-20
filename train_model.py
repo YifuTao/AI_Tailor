@@ -86,6 +86,12 @@ def parse_args():
         type=str,
         help="save name of the trained model ['trained_model']"
     )
+    parser.add_argument(
+        "--iteration",
+        default=1,
+        type=int,
+        help="number of iteration in the regression [1]"
+    )
     return parser.parse_args()
 
 
@@ -118,18 +124,20 @@ def load_data(total_dataset_size, parent_dic, args):
     return dataloader
 
 
-def myresnet50(device, num_output=79, use_pretrained=True, num_views=1):
+def myresnet50(device, num_output=82, use_pretrained=True, num_views=1, num_iteration=1):
 
     import resnet_multi_view
     model = resnet_multi_view.resnet50(
-        pretrained=use_pretrained, num_views=num_views)
+        pretrained=use_pretrained, num_views=num_views, num_iteration=num_iteration, num_output=num_output)
     #model = torchvision.models.resnet50(pretrained=use_pretrained)
     num_ftrs = model.fc.in_features # * num_views
 
     # print(num_ftrs)    # 2048 : features
     # print(model.fc.out_features)   #1000 resnet deafult: number of output classes
     # change output number of classes
-    model.fc = nn.Linear(num_ftrs, num_output)
+    # model.fc = nn.Linear(num_ftrs, num_output)
+    model.mlp = nn.Linear(num_ftrs+num_output, num_output)
+    model.pool = nn.AdaptiveAvgPool1d(1)
 
     model = model.to(device)
     # model = nn.DataParallel(model)     # multi GPU
@@ -144,7 +152,9 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
     a = []
     while len(a) != 8:
         print('weights: pose shape ver h c w n a:')
-        a = [float(x) for x in raw_input().split()]
+        a = [0.1, 0.1, 0.1, 0.0, 0.01, 0.01, 0.01, 0.01]   # no height loss
+        # a = [float(x) for x in raw_input().split()]
+
     pose_w = a[0]
     shape_w= a[1]
     ver_w=a[2]
@@ -231,10 +241,10 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
 
                 # forward
                 # track history if only in train
-                counter = 0
                 with torch.set_grad_enabled(phase == 'train'):
                     # prediction
                     par_prd = model(inputs)
+                    par_prd = par_prd[:,:,args.iteration-1].reshape(batch, 82)
                     rots, poses, betas = decompose_par(par_prd)
                     mesh_prd = par_to_mesh(args.gender, rots, poses, betas)
 
@@ -258,16 +268,12 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                     ver_loss = criterion(vertices_prd, vertices_gt)
                     
                     h_loss = criterion(h_prd, h_gt)
-                    ratio_prd = 1.70/h_prd
-                    ratio_gt = 1.70/h_gt
-                    h_loss = criterion(h_prd, h_gt)
-                    c_loss = criterion(c_prd*ratio_prd, c_gt*ratio_gt)
-
-                    
-                    w_loss = criterion(w_prd*ratio_prd, w_gt*ratio_gt)
-                    
-                    n_loss = criterion(n_prd*ratio_prd, n_gt*ratio_gt)
-                    a_loss = criterion(a_prd*ratio_prd, a_gt*ratio_gt)
+                    # ratio_prd = 1.76/h_prd
+                    # ratio_gt = 1.76/h_gt
+                    c_loss = criterion(c_prd, c_gt)
+                    w_loss = criterion(w_prd, w_gt)
+                    n_loss = criterion(n_prd, n_gt)
+                    a_loss = criterion(a_prd, a_gt)
                     
 
                     loss = pose_loss * pose_w + shape_loss * shape_w + ver_loss * ver_w 
@@ -292,16 +298,6 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                 running_loss_n += n_loss.item() * batch
                 running_loss_a += a_loss.item() * batch
                 
-            '''
-            if (epoch+1) % 5 == 0:
-                print(phase, '-----------------------')
-                for k in range(2):
-                    print('Ground truth shape par')
-                    print(par_gt[k][72:].to("cpu").numpy(),)
-                    print('Prediction')
-                    print(par_prd[k][72:].to("cpu").detach().numpy(),)
-                    print()
-            '''
 
             if phase == 'train':
                 scheduler.step()
@@ -409,19 +405,19 @@ def main():
     print('Gender: ', args.gender)
     print('Dataset size: ', args.dataset_size)
     print('Batch size: ', args.batch_size)
-    # parent_dic = "/home/yifu/workspace/data/synthetic/noise_free"
-    parent_dic = raw_input('Data Path:')
+    parent_dic = "/home/yifu/workspace/data/synthetic/noise_free"
+    # parent_dic = raw_input('Data Path:')
     while os.path.exists(parent_dic)==False:
         print('Wrong data path!')
         parent_dic = raw_input('Data Path:')  
     if os.path.exists(join(parent_dic,'trained_model'))==False:
         print('No trained_model folder in Data path!')
         exit()
-    # save_name = 'data:%d.pth' % args.dataset_size
-    save_name = raw_input('Name of the model weights saved:')
+    # save_name = raw_input('Name of the model weights saved:')
+    save_name = 'test'
     save_path = os.path.join(parent_dic,'trained_model', save_name+'.pth')
     
-    while os.path.exists(save_path):
+    while os.path.exists(save_path) and save_name!='test':
         print('Network weights save path will overwrite existing pth file!')
         save_name = raw_input('Name of the model weights saved:')
         save_path = os.path.join(parent_dic,'trained_model', save_name+'.pth')
@@ -438,9 +434,9 @@ def main():
 
     dataloader = load_data(args.dataset_size, parent_dic, args)
 
-    iteration = int(raw_input('Number of iterations in the neuron network: '))
+    # iteration = int(raw_input('Number of iterations in the neuron network: '))
     model = myresnet50(device, num_output=args.num_output,
-                       use_pretrained=True, num_views=args.num_views, num_iteration = iteration)
+                       use_pretrained=True, num_views=args.num_views, num_iteration = args.iteration)
     criterion = nn.MSELoss()    # Mean suqared error for each element
     optimiser = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
     exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=10, gamma=0.1)
