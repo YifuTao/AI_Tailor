@@ -42,7 +42,7 @@ Epoch 24/24
 t Loss: 0.0137 RMS Shape 0.3142 Pose 0.1749 Ver 0.0857 Chest 3.07cm Waist 3.49cm Neck 1.01cm Arm1.42cm H10.70cm
 v Loss: 0.0647 RMS Shape 0.7759 Pose 0.1725 Ver 0.1194 Chest 3.92cm Waist 5.85cm Neck 1.17cm Arm2.19cm H14.89cm
 
-# dataset:1000
+# dataset:1,000
 # Baseline 
 Epoch 1/24
 ----------
@@ -71,4 +71,31 @@ Epoch 24/24
 t Loss: 0.0092 RMS Shape 0.2774 Pose 0.1065 Ver 0.0566 Chest 2.50cm Waist 3.07cm Neck 0.70cm Arm0.85cm H4.93cm
 v Loss: 0.0319 RMS Shape 0.5470 Pose 0.1180 Ver 0.0747 Chest 3.08cm Waist 3.84cm Neck 0.84cm Arm1.73cm H7.69cm
 
+# dataset:10,000 (iterave worse)
+# Baseline
+Epoch 1/24
+----------
+t Loss: 0.0264 RMS Shape 0.5081 Pose 0.0611 Ver 0.0403 Chest 3.93cm Waist 5.19cm Neck 1.09cm Arm1.45cm H4.57cm
+v Loss: 0.0276 RMS Shape 0.5205 Pose 0.0571 Ver 0.0363 Chest 1.72cm Waist 2.32cm Neck 0.50cm Arm1.77cm H3.86cm
+Epoch 5/24
+----------
+t Loss: 0.0155 RMS Shape 0.3909 Pose 0.0384 Ver 0.0250 Chest 2.56cm Waist 3.40cm Neck 0.71cm Arm1.24cm H3.53cm
+v Loss: 0.0084 RMS Shape 0.2867 Pose 0.0382 Ver 0.0243 Chest 2.15cm Waist 3.88cm Neck 0.66cm Arm1.68cm H4.84cm
+Epoch 24/24
+----------
+t Loss: 0.0050 RMS Shape 0.2196 Pose 0.0302 Ver 0.0187 Chest 1.29cm Waist 1.64cm Neck 0.37cm Arm0.71cm H2.14cm
+v Loss: 0.0027 RMS Shape 0.1590 Pose 0.0304 Ver 0.0182 Chest 1.00cm Waist 1.22cm Neck 0.28cm Arm0.51cm H1.58cm
+# Iterative (3)
+Epoch 1/24
+----------
+t Loss: 0.0297 RMS Shape 0.5380 Pose 0.0603 Ver 0.0583 Chest 4.17cm Waist 5.65cm Neck 1.19cm Arm1.55cm H6.34cm
+v Loss: 0.0155 RMS Shape 0.3858 Pose 0.0539 Ver 0.0430 Chest 5.96cm Waist 7.81cm Neck 1.58cm Arm0.75cm H3.33cm
+Epoch 5/24
+----------
+t Loss: 0.0189 RMS Shape 0.4309 Pose 0.0387 Ver 0.0366 Chest 3.20cm Waist 4.26cm Neck 0.89cm Arm1.36cm H4.09cm
+v Loss: 0.0217 RMS Shape 0.4635 Pose 0.0392 Ver 0.0295 Chest 1.55cm Waist 3.71cm Neck 0.57cm Arm0.66cm H1.95cm
+Epoch 24/24
+----------
+t Loss: 0.0081 RMS Shape 0.2830 Pose 0.0303 Ver 0.0179 Chest 1.62cm Waist 2.19cm Neck 0.46cm Arm0.87cm H2.47cm
+v Loss: 0.0032 RMS Shape 0.1753 Pose 0.0302 Ver 0.0169 Chest 1.02cm Waist 1.22cm Neck 0.28cm Arm0.63cm H1.78cm
 
