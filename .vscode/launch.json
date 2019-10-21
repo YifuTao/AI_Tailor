@@ -11,7 +11,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--dataset_size", "100", "--batch_size","40"]
+            "args": ["--dataset_size", "300", "--batch_size","40", "--iteration","3"]
         }
     ]
 }

@@ -235,30 +235,26 @@ class ResNet(nn.Module):
 
         # IEF Loop
         batch = x.size()[0] / self.num_views
-        theta_prev = torch.zeros(batch, 82).cuda() # 82 SMPL Pamameter
-        # theta_prev[;, 51]=np.pi/4
-        # theta_prev[;, 54]=np.pi/4
-        theta = torch.FloatTensor([]).cuda()
-        for i in range(0, self.num_iteration):
-            theta_cat = torch.FloatTensor([]).cuda()
-            for j in range(0, self.num_views):
-                state = torch.cat((parts[j],theta_prev), 1)  # 2048 features + 82 SMPL Par 
-                delta_theta = self.mlp(state)
-                theta_tmp = torch.unsqueeze((theta_prev + delta_theta), 2)
-                theta_cat = torch.cat((theta_cat, theta_tmp),2)
-            theta_prev = self.pool(theta_cat)
-            theta = torch.cat((theta, theta_prev),2)
-            theta_prev = theta_prev.reshape(batch,-1)
-        
-        '''
+        ftr_prev = torch.zeros(batch, x.size()[1]).cuda() # global feature
+        ftr = torch.FloatTensor([]).cuda()
+
         max_pool = nn.MaxPool1d(self.num_views)
-        x = max_pool(x)
-        x = x.reshape(x.size(0), -1)    # size: batch x 2048
+        for i in range(0, self.num_iteration):
+            ftr_cat = torch.FloatTensor([]).cuda()
+            for j in range(0, self.num_views):
+                state = torch.cat((parts[j],ftr_prev), 1)  # 2048 features + 82 SMPL Par 
+                delta_ftr = self.mlp(state)
+                ftr_tmp = torch.unsqueeze((ftr_prev + delta_ftr), 2)
+                ftr_cat = torch.cat((ftr_cat, ftr_tmp),2)
+            # ftr_prev = self.pool(ftr_cat)
+            ftr_prev = max_pool(ftr_cat).reshape(batch, -1)    # new global feature
+
+        x = ftr_prev
 
         x = self.fc(x)
         # torch.Size([batch, 82])
-        '''
-        return theta
+        
+        return x
 
 
 def _resnet(arch, block, layers, pretrained, progress, **kwargs):

@@ -135,9 +135,8 @@ def myresnet50(device, num_output=82, use_pretrained=True, num_views=1, num_iter
     # print(num_ftrs)    # 2048 : features
     # print(model.fc.out_features)   #1000 resnet deafult: number of output classes
     # change output number of classes
-    # model.fc = nn.Linear(num_ftrs, num_output)
-    model.mlp = nn.Linear(num_ftrs+num_output, num_output)
-    model.pool = nn.AdaptiveAvgPool1d(1)
+    model.fc = nn.Linear(num_ftrs, num_output)
+    model.mlp = nn.Linear(num_ftrs*2, num_ftrs)
 
     model = model.to(device)
     # model = nn.DataParallel(model)     # multi GPU
@@ -244,7 +243,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                 with torch.set_grad_enabled(phase == 'train'):
                     # prediction
                     par_prd = model(inputs)
-                    par_prd = par_prd[:,:,args.iteration-1].reshape(batch, 82)
+                    # par_prd = par_prd[:,:,args.iteration-1].reshape(batch, 82)
                     rots, poses, betas = decompose_par(par_prd)
                     mesh_prd = par_to_mesh(args.gender, rots, poses, betas)
 
@@ -413,8 +412,8 @@ def main():
     if os.path.exists(join(parent_dic,'trained_model'))==False:
         print('No trained_model folder in Data path!')
         exit()
-    # save_name = raw_input('Name of the model weights saved:')
-    save_name = 'test'
+    save_name = raw_input('Name of the model weights saved:')
+    # save_name = 'test'
     save_path = os.path.join(parent_dic,'trained_model', save_name+'.pth')
     
     while os.path.exists(save_path) and save_name!='test':
