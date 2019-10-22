@@ -1,0 +1,146 @@
+python train_model.py --batch_size 40 --dataset_size 300 --iteration 2 --gpu 1
+-----------------------------------------------------------
+Gender:  male
+Dataset size:  300
+Batch size:  40
+Name of the model weights saved:test
+-----------------------------------------------------------
+Save path:  /home/yifu/workspace/data/synthetic/noise_free/trained_model/test.pth
+-----------------------------------------------------------
+Confirm the above setting? (yes/no): yes
+Training starts
+-----------------------------------------------------------
+weights: pose shape ver h c w n a:
+Parameter Weights
+Pose 0.100 Shape 0.100 Ver 0.100
+Height 0.000 Chest 0.010 Waist 0.010 Neck 0.010 Arm 0.010
+----------------------------------------------------
+No handlers could be found for logger "visdom"
+Epoch 0/24
+----------
+t Loss: 0.3307 RMS Shape 1.7735 Pose 0.3009 Ver 0.2540 Chest 15.26cm Waist 20.61cm Neck 4.24cm Arm5.21cm H49.27cm
+v Loss: 0.3155 RMS Shape 1.7523 Pose 0.2204 Ver 0.1682 Chest 15.26cm Waist 22.97cm Neck 4.28cm Arm4.35cm H15.31cm
+
+Epoch 1/24
+----------
+t Loss: 0.2966 RMS Shape 1.7031 Pose 0.1620 Ver 0.1829 Chest 13.39cm Waist 17.72cm Neck 3.58cm Arm5.13cm H26.25cm
+v Loss: 0.3053 RMS Shape 1.7239 Pose 0.2227 Ver 0.1560 Chest 14.65cm Waist 20.90cm Neck 4.12cm Arm4.14cm H28.04cm
+
+Epoch 2/24
+----------
+t Loss: 0.2638 RMS Shape 1.6068 Pose 0.1717 Ver 0.1510 Chest 11.02cm Waist 14.45cm Neck 3.04cm Arm5.21cm H26.67cm
+v Loss: 0.2980 RMS Shape 1.7089 Pose 0.1797 Ver 0.1444 Chest 13.13cm Waist 20.45cm Neck 3.99cm Arm4.22cm H20.80cm
+
+Epoch 3/24
+----------
+t Loss: 0.2266 RMS Shape 1.4933 Pose 0.1371 Ver 0.1241 Chest 8.24cm Waist 10.96cm Neck 2.27cm Arm4.57cm H16.78cm
+v Loss: 0.2906 RMS Shape 1.6899 Pose 0.1782 Ver 0.1144 Chest 12.56cm Waist 18.60cm Neck 3.91cm Arm3.62cm H21.48cm
+
+Epoch 4/24
+----------
+t Loss: 0.1930 RMS Shape 1.3765 Pose 0.1419 Ver 0.1160 Chest 7.45cm Waist 9.68cm Neck 2.10cm Arm4.32cm H18.10cm
+v Loss: 0.2649 RMS Shape 1.6136 Pose 0.1608 Ver 0.1253 Chest 9.37cm Waist 15.16cm Neck 3.13cm Arm4.11cm H13.69cm
+
+Epoch 5/24
+----------
+t Loss: 0.1546 RMS Shape 1.2302 Pose 0.1385 Ver 0.1096 Chest 6.58cm Waist 8.85cm Neck 1.86cm Arm3.89cm H15.33cm
+v Loss: 0.2206 RMS Shape 1.4720 Pose 0.1505 Ver 0.1106 Chest 10.14cm Waist 17.27cm Neck 3.56cm Arm3.57cm H14.12cm
+
+Epoch 6/24
+----------
+t Loss: 0.1174 RMS Shape 1.0681 Pose 0.1436 Ver 0.1054 Chest 5.77cm Waist 7.50cm Neck 1.48cm Arm3.67cm H12.44cm
+v Loss: 0.2021 RMS Shape 1.4060 Pose 0.1574 Ver 0.1334 Chest 6.77cm Waist 10.44cm Neck 1.91cm Arm3.55cm H20.25cm
+
+Epoch 7/24
+----------
+t Loss: 0.0929 RMS Shape 0.9468 Pose 0.1440 Ver 0.0994 Chest 7.72cm Waist 10.33cm Neck 2.13cm Arm3.38cm H13.43cm
+v Loss: 0.1332 RMS Shape 1.1400 Pose 0.1442 Ver 0.0947 Chest 8.44cm Waist 12.84cm Neck 2.65cm Arm3.13cm H13.07cm
+
+Epoch 8/24
+----------
+t Loss: 0.0710 RMS Shape 0.8238 Pose 0.1446 Ver 0.0965 Chest 6.43cm Waist 8.69cm Neck 1.67cm Arm2.86cm H12.17cm
+v Loss: 0.1454 RMS Shape 1.1909 Pose 0.1482 Ver 0.1140 Chest 5.45cm Waist 9.25cm Neck 1.68cm Arm2.82cm H14.96cm
+
+Epoch 9/24
+----------
+t Loss: 0.0529 RMS Shape 0.7053 Pose 0.1451 Ver 0.0964 Chest 5.13cm Waist 6.88cm Neck 1.32cm Arm2.58cm H10.60cm
+v Loss: 0.1493 RMS Shape 1.2065 Pose 0.1556 Ver 0.0993 Chest 11.01cm Waist 12.37cm Neck 3.44cm Arm5.06cm H16.50cm
+
+Epoch 10/24
+----------
+t Loss: 0.0478 RMS Shape 0.6685 Pose 0.1456 Ver 0.0920 Chest 5.59cm Waist 7.17cm Neck 1.75cm Arm3.14cm H14.02cm
+v Loss: 0.1026 RMS Shape 0.9998 Pose 0.1326 Ver 0.0877 Chest 4.97cm Waist 7.22cm Neck 1.63cm Arm3.20cm H15.83cm
+
+Epoch 11/24
+----------
+t Loss: 0.0339 RMS Shape 0.5564 Pose 0.1441 Ver 0.0889 Chest 4.00cm Waist 4.88cm Neck 1.17cm Arm2.10cm H11.02cm
+v Loss: 0.1030 RMS Shape 1.0007 Pose 0.1353 Ver 0.0945 Chest 5.70cm Waist 7.43cm Neck 1.70cm Arm2.49cm H12.79cm
+
+Epoch 12/24
+----------
+t Loss: 0.0326 RMS Shape 0.5446 Pose 0.1440 Ver 0.0886 Chest 3.93cm Waist 5.25cm Neck 1.04cm Arm2.05cm H9.53cm
+v Loss: 0.0882 RMS Shape 0.9233 Pose 0.1367 Ver 0.0983 Chest 5.24cm Waist 7.26cm Neck 1.68cm Arm2.57cm H13.18cm
+
+Epoch 13/24
+----------
+t Loss: 0.0299 RMS Shape 0.5200 Pose 0.1439 Ver 0.0879 Chest 3.95cm Waist 4.99cm Neck 1.02cm Arm1.99cm H9.83cm
+v Loss: 0.0859 RMS Shape 0.9111 Pose 0.1372 Ver 0.0961 Chest 4.72cm Waist 6.62cm Neck 1.62cm Arm2.58cm H14.08cm
+
+Epoch 14/24
+----------
+t Loss: 0.0281 RMS Shape 0.5025 Pose 0.1433 Ver 0.0857 Chest 3.16cm Waist 4.09cm Neck 0.88cm Arm1.85cm H9.92cm
+v Loss: 0.0940 RMS Shape 0.9555 Pose 0.1341 Ver 0.0933 Chest 4.67cm Waist 6.62cm Neck 1.55cm Arm2.76cm H14.59cm
+
+Epoch 15/24
+----------
+t Loss: 0.0279 RMS Shape 0.5010 Pose 0.1426 Ver 0.0845 Chest 3.70cm Waist 5.01cm Neck 1.08cm Arm1.72cm H9.73cm
+v Loss: 0.0865 RMS Shape 0.9154 Pose 0.1326 Ver 0.0937 Chest 4.76cm Waist 6.92cm Neck 1.63cm Arm2.58cm H14.57cm
+
+Epoch 16/24
+----------
+t Loss: 0.0252 RMS Shape 0.4735 Pose 0.1431 Ver 0.0847 Chest 3.35cm Waist 4.21cm Neck 0.97cm Arm1.73cm H9.60cm
+v Loss: 0.0873 RMS Shape 0.9196 Pose 0.1335 Ver 0.0959 Chest 4.87cm Waist 7.16cm Neck 1.61cm Arm2.63cm H14.98cm
+
+Epoch 17/24
+----------
+t Loss: 0.0241 RMS Shape 0.4616 Pose 0.1425 Ver 0.0833 Chest 3.22cm Waist 4.34cm Neck 0.92cm Arm1.80cm H9.14cm
+v Loss: 0.0864 RMS Shape 0.9141 Pose 0.1346 Ver 0.0953 Chest 4.96cm Waist 6.86cm Neck 1.64cm Arm2.71cm H14.53cm
+
+Epoch 18/24
+----------
+t Loss: 0.0242 RMS Shape 0.4635 Pose 0.1422 Ver 0.0831 Chest 3.03cm Waist 3.80cm Neck 0.88cm Arm1.67cm H9.29cm
+v Loss: 0.0879 RMS Shape 0.9226 Pose 0.1333 Ver 0.0939 Chest 4.85cm Waist 6.71cm Neck 1.59cm Arm2.60cm H13.96cm
+
+Epoch 19/24
+----------
+t Loss: 0.0219 RMS Shape 0.4380 Pose 0.1424 Ver 0.0827 Chest 3.15cm Waist 3.99cm Neck 0.95cm Arm1.69cm H9.94cm
+v Loss: 0.0848 RMS Shape 0.9063 Pose 0.1327 Ver 0.0924 Chest 4.87cm Waist 6.76cm Neck 1.59cm Arm2.64cm H14.26cm
+
+Epoch 20/24
+----------
+t Loss: 0.0218 RMS Shape 0.4369 Pose 0.1418 Ver 0.0820 Chest 3.27cm Waist 4.18cm Neck 0.93cm Arm1.58cm H9.72cm
+v Loss: 0.0847 RMS Shape 0.9058 Pose 0.1323 Ver 0.0933 Chest 4.97cm Waist 6.86cm Neck 1.58cm Arm2.63cm H14.42cm
+
+Epoch 21/24
+----------
+t Loss: 0.0201 RMS Shape 0.4169 Pose 0.1423 Ver 0.0821 Chest 3.35cm Waist 3.92cm Neck 0.92cm Arm1.60cm H9.87cm
+v Loss: 0.0828 RMS Shape 0.8946 Pose 0.1331 Ver 0.0936 Chest 4.77cm Waist 6.68cm Neck 1.59cm Arm2.65cm H14.90cm
+
+Epoch 22/24
+----------
+t Loss: 0.0216 RMS Shape 0.4348 Pose 0.1417 Ver 0.0822 Chest 2.82cm Waist 3.77cm Neck 0.84cm Arm1.54cm H9.90cm
+v Loss: 0.0854 RMS Shape 0.9090 Pose 0.1330 Ver 0.0939 Chest 4.76cm Waist 6.64cm Neck 1.58cm Arm2.67cm H14.83cm
+
+Epoch 23/24
+----------
+t Loss: 0.0203 RMS Shape 0.4199 Pose 0.1419 Ver 0.0822 Chest 3.39cm Waist 4.08cm Neck 0.90cm Arm1.56cm H9.60cm
+v Loss: 0.0851 RMS Shape 0.9076 Pose 0.1331 Ver 0.0947 Chest 4.91cm Waist 6.77cm Neck 1.57cm Arm2.65cm H15.15cm
+
+Epoch 24/24
+----------
+t Loss: 0.0212 RMS Shape 0.4302 Pose 0.1419 Ver 0.0823 Chest 3.21cm Waist 4.18cm Neck 0.91cm Arm1.54cm H9.38cm
+v Loss: 0.0833 RMS Shape 0.8978 Pose 0.1326 Ver 0.0944 Chest 4.74cm Waist 6.61cm Neck 1.60cm Arm2.60cm H14.65cm
+
+Training complete in 5m 53s
+Best val Loss: 0.082757
+

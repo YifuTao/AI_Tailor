@@ -226,32 +226,38 @@ class ResNet(nn.Module):
         x = x.reshape(x.size(0), -1)  # torch.Size([num_views x batch, 2048])
         
         parts = torch.chunk(x,self.num_views,0)  # parts[k] : torch.Size([batch, 2048])
-        '''
-        x=torch.unsqueeze(parts[0], 2)
-        for k in range(1,self.num_views):
-            part = torch.unsqueeze(parts[k], 2)
-            x = torch.cat((x,part),2)    # torch.Size([batch, 2048, num_views])
-        '''
 
         # IEF Loop
         batch = x.size()[0] / self.num_views
-        ftr_prev = torch.zeros(batch, x.size()[1]).cuda() # global feature
-        ftr = torch.FloatTensor([]).cuda()
-
         max_pool = nn.MaxPool1d(self.num_views)
+        
+        ## Initialisation
+
+        # ftr_global = torch.zeros(batch, x.size()[1]).cuda() # global feature
+        ftr_init=torch.unsqueeze(parts[0], 2)
+        for k in range(1,self.num_views):
+            part = torch.unsqueeze(parts[k], 2)
+            ftr_init = torch.cat((ftr_init,part),2)    # torch.Size([batch, 2048, num_views])
+
+        ftr_global = max_pool(ftr_init).reshape(batch, -1)
+        # prm_global = torch.zeros(batch, self.num_output).cuda()
+        prm_global = self.fc(ftr_global)
+        
+
         for i in range(0, self.num_iteration):
             ftr_cat = torch.FloatTensor([]).cuda()
             for j in range(0, self.num_views):
-                state = torch.cat((parts[j],ftr_prev), 1)  # 2048 features + 82 SMPL Par 
+                state = torch.cat((parts[j], prm_global), 1)  # 2048 features + 82 SMPL Par 
                 delta_ftr = self.mlp(state)
-                ftr_tmp = torch.unsqueeze((ftr_prev + delta_ftr), 2)
-                ftr_cat = torch.cat((ftr_cat, ftr_tmp),2)
-            # ftr_prev = self.pool(ftr_cat)
-            ftr_prev = max_pool(ftr_cat).reshape(batch, -1)    # new global feature
+                ftr_per_view = torch.unsqueeze((ftr_global + delta_ftr), 2)
+                ftr_cat = torch.cat((ftr_cat, ftr_per_view),2)
+            # ftr_global = self.pool(ftr_cat)
+            ftr_global = max_pool(ftr_cat).reshape(batch, -1)    # new global feature
+            prm_global = self.fc(ftr_global)
 
-        x = ftr_prev
+        x = prm_global
 
-        x = self.fc(x)
+        # x = self.fc(x)
         # torch.Size([batch, 82])
         
         return x
