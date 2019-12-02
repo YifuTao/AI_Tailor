@@ -135,7 +135,7 @@ def myresnet50(device, num_output=82, use_pretrained=True, num_views=1, num_iter
     # print(num_ftrs)    # 2048 : features
     # print(model.fc.out_features)   #1000 resnet deafult: number of output classes
     # change output number of classes
-    model.fc = nn.Linear(num_ftrs, num_output)
+    model.fc = nn.Linear(num_ftrs + num_output, num_output)
     model.mlp = nn.Linear(num_ftrs + num_output, num_ftrs)
 
     model = model.to(device)

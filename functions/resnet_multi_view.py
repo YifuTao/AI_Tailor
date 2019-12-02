@@ -240,8 +240,8 @@ class ResNet(nn.Module):
             ftr_init = torch.cat((ftr_init,part),2)    # torch.Size([batch, 2048, num_views])
 
         ftr_global = max_pool(ftr_init).reshape(batch, -1)
-        # prm_global = torch.zeros(batch, self.num_output).cuda()
-        prm_global = self.fc(ftr_global)
+        prm_global = torch.zeros(batch, self.num_output).cuda()
+        # prm_global = self.fc(ftr_global)
         
 
         for i in range(0, self.num_iteration):
@@ -253,7 +253,9 @@ class ResNet(nn.Module):
                 ftr_cat = torch.cat((ftr_cat, ftr_per_view),2)
             # ftr_global = self.pool(ftr_cat)
             ftr_global = max_pool(ftr_cat).reshape(batch, -1)    # new global feature
-            prm_global = self.fc(ftr_global)
+            state = torch.cat((ftr_global, prm_global), 1)
+            delta_prm = self.fc(state)
+            prm_global += delta_prm 
 
         x = prm_global
 
