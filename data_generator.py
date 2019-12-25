@@ -5,13 +5,15 @@ import torch
 import numpy as np
 import time
 from PIL import Image
+from skimage.io import imread, imsave
+
 
 import sys
 sys.path.append('functions')
 from SMPL_Pytorch import rodrigues, get_poseweights, par_to_mesh
 from render import mesh2Image, transpose_mesh, scale_mesh
 from scale_mask import scale_fixed_height
-
+import neural_renderer as nr
 
 
 def parse_args():
@@ -67,6 +69,37 @@ def parse_args():
     )
     return parser.parse_args()
 
+def generate_rots_poses_betas():
+    rots = (torch.zeros(1,3)).cuda()    # global rotation
+    poses = (torch.zeros(1,23,3)).cuda()   # joints
+    variation = 3
+    betas = (torch.rand(1,10) * variation*2 - variation).cuda()    # shapes
+
+    poses[0][17 - 1][2] = np.pi/4   # right shoulder joint
+    poses[0][16 - 1][2] = - np.pi/4   # left shoulder joint
+    
+    variation = 0.3
+    poses[0][17 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
+    
+    poses[0][16 - 1][2] = - poses[0][17 - 1][2]
+    
+    variation = 0.15
+    poses[0][16 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
+
+    poses[0][1 - 1][2] = np.pi/40
+    variation = np.pi/40
+    poses[0][1 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
+    poses[0][2 - 1][2] = -np.pi/40
+    variation = np.pi/40
+    poses[0][2 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
+
+    variation = 0.03
+    for j in range(0,23):
+        for k in range(0,3):
+            poses[0][j][k] += torch.rand(1)[0] *variation*2 - variation
+    return rots, poses, betas
+    
+
 def main():
     args = parse_args()
     #args.dataset_size = 10
@@ -76,7 +109,7 @@ def main():
     m = pickle.load(open('models/basicModel_%s_lbs_10_207_0_v1.0.0.pkl' % gender[0]))
     dataset_size = args.dataset_size
     print'Dataset range:', args.start_num, ' - ', dataset_size+args.start_num-1
-    parent_dic = '/home/yifu/workspace/data/synthetic/noisy/val'
+    parent_dic = '/home/yifu/workspace/data/synthetic/multiview/val'
     print 'Data Path: ',parent_dic
     device = torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(device)
@@ -89,38 +122,9 @@ def main():
 
     for i in range(0,  dataset_size):
         i = i + args.start_num
-
-        rots = (torch.zeros(1,3)).cuda()    # global rotation
-        poses = (torch.zeros(1,23,3)).cuda()   # joints
-        variation = 3
-        betas = (torch.rand(1,10) * variation*2 - variation).cuda()    # shapes
-
-        poses[0][17 - 1][2] = np.pi/4   # right shoulder joint
-        poses[0][16 - 1][2] = - np.pi/4   # left shoulder joint
-        
-        variation = 0.3
-        poses[0][17 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
-        
-        poses[0][16 - 1][2] = - poses[0][17 - 1][2]
-        
-        variation = 0.15
-        poses[0][16 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
-
-        poses[0][1 - 1][2] = np.pi/40
-        variation = np.pi/40
-        poses[0][1 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
-        poses[0][2 - 1][2] = -np.pi/40
-        variation = np.pi/40
-        poses[0][2 - 1][2] += (torch.rand(1)[0] * variation*2 - variation).cuda()
-
-        variation = 0.03
-        for j in range(0,23):
-            for k in range(0,3):
-                poses[0][j][k] += torch.rand(1)[0] *variation*2 - variation
-        
-
+        rots, poses, betas = generate_rots_poses_betas()
         vertices = par_to_mesh(gender, rots, poses, betas)
-        
+   
         # rendering
         vertices_num = 6890
         path = parent_dic
@@ -128,37 +132,64 @@ def main():
         img_height = 264
         img_width = 192 
 
-        # frontal view
-        name = '%d_0'%i
-        v = vertices.squeeze().to("cpu").numpy()
-        angle = np.pi
-        axis = np.array([0, 0, 1])
-        v = transpose_mesh(v, angle, axis)
-        angle = np.pi
+        # inital calibration for opendr
+        
+        vertices = vertices.squeeze().to("cpu").numpy() # frontal view vertices
+
+        # multi views
+        num_view = 8
+        camera = torch.zeros(num_view).cuda()
+
+        angle = 2*np.pi / num_view    
         axis = np.array([0, 1, 0])
-        v = transpose_mesh(v, angle, axis)
-        v_0 = scale_mesh(v, 400, 400, vertices_num=vertices_num)
-        mesh2Image(v_0, m['f'], batch, path, name, 400, 400, vertices_num=vertices_num)
-        image = Image.open(join(path,name+'.png'))
-        output = scale_fixed_height(image,img_height,img_width)
-        output_name = join(path, name+'.png')
-        output.save(output_name)
-        # side view
-        name = '%d_1'%i
-        angle = np.pi/2
-        axis = np.array([0, -1, 0])
-        v = transpose_mesh(v, angle, axis)
-        v_1 = scale_mesh(v, 400, 400, vertices_num=vertices_num)
-        mesh2Image(v_1, m['f'], batch, path, name, 400, 400, vertices_num=vertices_num)
-        image = Image.open(join(path,name+'.png'))
-        output = scale_fixed_height(image,img_height,img_width)
-        output_name = join(path, name+'.png')
-        output.save(output_name)
+        
+
+        for view in range (0, num_view):
+            name = '%d_%d'%(i, view)
+
+            noise = angle * (np.random.rand()-0.5)
+            mesh_rot = angle * view + noise 
+            v = transpose_mesh(vertices, mesh_rot, axis)    # temp vertices
+            camera[view] = mesh_rot
+            
+            
+            # rendering: opendr
+            '''
+            v_0 = scale_mesh(v, 400, 400, vertices_num=vertices_num)
+            mesh2Image(v_0, m['f'], batch, path, name, 400, 400, vertices_num=vertices_num)
+            image = Image.open(join(path,name+'.png'))
+            output = scale_fixed_height(image,img_height,img_width)
+            output_name = join(path, name+'.png')
+            output.save(output_name)
+            '''
+
+            # rendering: neural renderer
+            n_renderer = nr.Renderer(image_size=300, perspective=False, camera_mode='look_at')
+            f_test = torch.from_numpy(m['f'].astype(int)).cuda()
+            f_test = f_test[None, :, :]
+
+            v_test = v
+            # normalize mesh into a unit cube centered zero (length 2, -1 to 1), see nr/load_obj.py
+            v_test = torch.from_numpy(v_test).cuda()
+            v_test -= v_test.min(0)[0][None, :]
+            v_test /= torch.abs(v_test).max()
+            v_test *= 2
+            v_test -= v_test.max(0)[0][None, :] / 2
+
+            v_test = torch.unsqueeze(v_test.float(), 0)
+            images = n_renderer(v_test, f_test, mode='silhouettes') # silhouettes
+            image = images.detach().cpu().numpy()[0]
+            imsave(join(path, name+'.png'), image)
+
+            
+
         # pickle 
         poses = torch.reshape(poses, (1,-1))
-        parameters = torch.cat((rots[0], poses[0], betas[0]),0).to("cpu")
+
+        parameters = torch.cat((rots[0], poses[0], betas[0], camera),0).to("cpu")   # 82 SMPL + num_view
         
         pickle.dump(parameters, open('%s/%d' % (path, i), 'wb'))
+
         '''
         # mesh generator
         outmesh_path = join(path, '%d.obj'%i)
