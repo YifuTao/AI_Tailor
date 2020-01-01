@@ -153,6 +153,7 @@ class ResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.cam = nn.Linear(2048,1)    # could use nn.Sequential to add MPL and ReLU
         
         self.num_views = num_views  # added
 
@@ -228,7 +229,7 @@ class ResNet(nn.Module):
         #print(x.size()[0])     #12 = 2 (num_views) x 6(real batch size)
         #print(self.num_views)  #2
         
-        parts = torch.chunk(x,self.num_views,0)  # parts[k] : torch.Size([6, 2048])
+        parts = torch.chunk(x,self.num_views,0)  # parts[k] : torch.Size([batch, 2048])
         #print(len(x))  #num_views
         x=torch.unsqueeze(parts[0], 2)
         for k in range(1,self.num_views):
@@ -237,9 +238,18 @@ class ResNet(nn.Module):
         max_pool = nn.MaxPool1d(self.num_views)
         x = max_pool(x)
         x = x.reshape(x.size(0), -1)
-        x = self.fc(x)  # [6,79] real batch size is 6
+        x = self.fc(x)  
+        # torch.Size([batch, 82])
 
-        # torch.Size([batch, 79])
+
+        # camera
+        
+        camera = self.cam(parts[0])
+        for k in range (1, self.num_views):
+            camera_per_view = self.cam(parts[k])
+            camera=torch.cat((camera,camera_per_view),1)
+        
+        x = torch.cat((x,camera),1)
 
         return x
 
@@ -249,7 +259,7 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
     if pretrained:
         state_dict = torch.hub.load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
     return model
 
 

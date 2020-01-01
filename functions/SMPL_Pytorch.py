@@ -32,8 +32,10 @@ def rodrigues(r):
     #        +(1.-torch.cos(theta).view(-1, 1, 1)) * torch.matmul(Sn,Sn)
 
     I3 = Variable(torch.eye(3).unsqueeze(0).cuda())
+    # if Sn.max()>1e5 :
+    # print(Sn.max())
 
-    R = I3 \
+    R = I3  \
         + torch.sin(theta).view(-1, 1, 1)*Sn \
         + (1.-torch.cos(theta).view(-1, 1, 1)) * torch.matmul(Sn, Sn)
 

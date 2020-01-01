@@ -29,20 +29,13 @@ class HumanTestSet(data.Dataset):
 
         # image
         imgs=[]
+
         for i in range(0,self.num_views):
             img_name = os.path.join(self.root, '%d_%d.png' % (index,i))    #image
             img = Image.open(img_name)
-            '''
-            img = ToTensor()(img)
-            img[0] = torch.ones_like(img[0])
-            height = par[79]
-            img[0] *= height
-            img = ToPILImage()(img)
-            '''
             imgs.append(self.transform(img))
         
 
-   
         
 
         return index,imgs,par     #return imgs and label

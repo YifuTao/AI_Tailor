@@ -6,6 +6,7 @@ import numpy as np
 import time
 from PIL import Image
 from skimage.io import imread, imsave
+import cv2
 
 
 import sys
@@ -100,6 +101,34 @@ def generate_rots_poses_betas():
     return rots, poses, betas
     
 
+def scale_vert_nr_batch(v):      # v.shape=[batch, 6890, 3]
+    v = v - v.min(v.dim()-2)[0].unsqueeze(v.dim()-2)    #[None, :] == torch.unsqueeze( ,dimension 0)
+    v /= torch.abs(v).max(1)[0].max(1)[0].reshape(-1,1,1)
+    v *= 2
+    v -= v.max(v.dim()-2)[0].unsqueeze(v.dim()-2)/2
+
+    # v -= v.min(0)[0][None, :]
+    # v /= torch.abs(v).max()
+    # v *= 2
+    # v -= v.max(0)[0][None,:]/2
+
+    return v
+
+def scale_vert_nr_batch_forLoop(v): # v.shape=[batch, 6890, 3]
+    for i in range(v.shape[0]):
+        v[i,:,:] = scale_vert_nr(v[i,:,:])
+    return v
+        
+
+
+def scale_vert_nr(v):   # v.shape=[6890, 3]
+    v = v - v.min(0)[0][None, :]
+    # if torch.abs(v).max()>1:
+    v = v / torch.abs(v).max()
+    v = v * 2
+    v = v - v.max(0)[0][None,:]/2
+    return v
+
 def main():
     args = parse_args()
     #args.dataset_size = 10
@@ -114,7 +143,7 @@ def main():
     device = torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(device)
     print('-----------------------------------------------------------')
-    if raw_input('Confirm the above setting? (yes/no): ')!='yes':
+    if raw_input('Confirm the above setting? (y/n): ')!='y':
         print('Terminated')
         exit()
     print'Data generation starts'
@@ -131,8 +160,6 @@ def main():
         batch = 1
         img_height = 264
         img_width = 192 
-
-        # inital calibration for opendr
         
         vertices = vertices.squeeze().to("cpu").numpy() # frontal view vertices
 
@@ -165,22 +192,42 @@ def main():
 
             # rendering: neural renderer
             n_renderer = nr.Renderer(image_size=300, perspective=False, camera_mode='look_at')
-            f_test = torch.from_numpy(m['f'].astype(int)).cuda()
-            f_test = f_test[None, :, :]
+            f_nr = torch.from_numpy(m['f'].astype(int)).cuda()
+            f_nr = f_nr[None, :, :]
 
-            v_test = v
+            v_nr = v
             # normalize mesh into a unit cube centered zero (length 2, -1 to 1), see nr/load_obj.py
-            v_test = torch.from_numpy(v_test).cuda()
-            v_test -= v_test.min(0)[0][None, :]
-            v_test /= torch.abs(v_test).max()
-            v_test *= 2
-            v_test -= v_test.max(0)[0][None, :] / 2
+            v_nr = torch.from_numpy(v_nr).cuda()
+            v_nr = scale_vert_nr(v_nr)
 
-            v_test = torch.unsqueeze(v_test.float(), 0)
-            images = n_renderer(v_test, f_test, mode='silhouettes') # silhouettes
-            image = images.detach().cpu().numpy()[0]
-            imsave(join(path, name+'.png'), image)
+            v_nr = torch.unsqueeze(v_nr.float(), 0)
+            images = n_renderer(v_nr, f_nr, mode='silhouettes') # silhouettes
+            image = images.detach().cpu().numpy()[0]*255
+            
+            cv2.imwrite(join(path, name+'.png'), image)
+            # imsave(join(path, name+'.png'), image)
 
+            # test: rotate mesh using parameter not transpose mesh, compare the generated vert and image
+            '''
+            rots[0][1] = mesh_rot
+            v_test = par_to_mesh(gender, rots, poses, betas)
+            v_nr = v_test.squeeze().to("cpu").numpy()
+            # print(np.array_equal(v,v_nr))
+            # normalize mesh into a unit cube centered zero (length 2, -1 to 1), see nr/load_obj.py
+            v_nr = torch.from_numpy(v_nr).cuda()
+            v_nr -= v_nr.min(0)[0][None, :]
+            v_nr /= torch.abs(v_nr).max()
+            v_nr *= 2
+            v_nr -= v_nr.max(0)[0][None, :] / 2
+
+            v_nr = torch.unsqueeze(v_nr.float(), 0)
+            images = n_renderer(v_nr, f_nr, mode='silhouettes') # silhouettes
+            image_cmp = images.detach().cpu().numpy()[0]*255
+            print(np.array_equal(image,image_cmp))
+            cv2.imwrite(join(path, name+'_par.png'), image)
+            '''
+            
+            
             
 
         # pickle 

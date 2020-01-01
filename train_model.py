@@ -8,6 +8,7 @@ import os
 from os.path import join
 import visdom
 import numpy as np
+import pickle
 
 import sys
 sys.path.append('functions')
@@ -15,6 +16,9 @@ from SMPL_Pytorch import par_to_mesh, decompose_par
 from body_measurements import vertex2measurements
 
 from smpl_webuser.serialization import load_model
+import neural_renderer as nr
+from data_generator import scale_vert_nr_batch_forLoop
+from nr_function import save_images
 
 
 def parse_args():
@@ -86,6 +90,12 @@ def parse_args():
         type=str,
         help="save name of the trained model ['trained_model']"
     )
+    parser.add_argument(
+        "--reprojection_loss",
+        default='n',
+        type=str,
+        help="whether use reprojection loss ['n']"
+    )
     return parser.parse_args()
 
 
@@ -118,7 +128,7 @@ def load_data(total_dataset_size, parent_dic, args):
     return dataloader
 
 
-def myresnet50(device, num_output=79, use_pretrained=True, num_views=1):
+def myresnet50(device, num_output=82, use_pretrained=True, num_views=1):
 
     import resnet_multi_view
     model = resnet_multi_view.resnet50(
@@ -135,11 +145,17 @@ def myresnet50(device, num_output=79, use_pretrained=True, num_views=1):
     # model = nn.DataParallel(model)     # multi GPU
     return model
 
+def three_channel(imgs): # make an image three identical channel 
+    imgs = imgs[:,0,:,:]
+    imgs=torch.unsqueeze(imgs,1)
+    imgs=torch.cat((imgs,imgs,imgs),1)
+    return imgs
 
 def train_model(parent_dic, save_name, vis_title, device, model, dataloader, criterion, optimiser, scheduler, args,):
     import time
     import copy
     
+    bce_loss = nn.BCELoss()
     since = time.time()
     a = []
     while len(a) != 8:
@@ -185,7 +201,10 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
     num_epochs = args.num_epochs
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = float("inf")
-    
+    n_renderer = nr.Renderer(image_size=300, perspective=False, camera_mode='look_at')
+    m = pickle.load(open('models/basicModel_%s_lbs_10_207_0_v1.0.0.pkl' % args.gender[0]))
+    f_nr = torch.from_numpy(m['f'].astype(int)).cuda()
+    f_nr = f_nr[None, :, :]
     
 
     for epoch in range(num_epochs):
@@ -196,6 +215,8 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
         record.write('-' * 10+'\n')
         record.close()
 
+        visualise_flag = 1
+
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
             if phase == 'train':
@@ -203,6 +224,8 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                 model.train()  # Set model to training mode
             else:
                 model.eval()   # Set model to evaluate mode
+            
+            visualise_flag = 1
 
             running_loss = 0.0
             running_loss_pose = 0.0
@@ -213,19 +236,29 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
             running_loss_w = 0.0
             running_loss_n = 0.0
             running_loss_a = 0.0
+            running_loss_cam = 0.0
 
             # Iterate over data.
-            for index, imgs, par_gt in dataloader[phase]:
+            for index, imgs, gt in dataloader[phase]:
                 
-                batch = par_gt.shape[0]
+                batch = gt.shape[0]
                 inputs = torch.FloatTensor([])
+                test=imgs
                 for k in range(0, len(imgs)):    # go through the views
+                    '''
+                    imgs[k] = imgs[k][:,0,:,:]
+                    imgs[k]=torch.unsqueeze(imgs[k],1)
+                    imgs[k]=torch.cat((imgs[k],imgs[k],imgs[k]),1)
+                    #print (torch.all(torch.eq(test[k][:,0,:,:],imgs[k][:,0,:,:])))
+                    #print(torch.all(torch.eq(test[k],imgs[k])))
+                    '''
+                    imgs[k]=three_channel(imgs[k])
                     inputs = torch.cat((inputs, imgs[k]), 0)
                 inputs = inputs.to(device)
 
-                par_gt = par_gt.float()  # from double to float
-                par_gt = par_gt[:,:args.num_output]
-                par_gt = par_gt.to(device)
+                gt = gt.float()  # from double to float
+                # par_gt = par_gt[:,:args.num_output]
+                gt = gt.to(device)
 
                 # zero the parameter gradients
                 optimiser.zero_grad()
@@ -234,9 +267,13 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                 # track history if only in train
                 counter = 0
                 with torch.set_grad_enabled(phase == 'train'):
+                    # torch.autograd.set_detect_anomaly(True)
                     # prediction
-                    par_prd = model(inputs)
+                    prediction = model(inputs)
+                    par_prd = prediction[:,:82]
+                    cam_prd = prediction[:,82:82+args.num_views]
                     rots, poses, betas = decompose_par(par_prd)
+                
                     mesh_prd = par_to_mesh(args.gender, rots, poses, betas)
 
                     X, Y, Z = [mesh_prd[:,:, 0], mesh_prd[:,:, 1], mesh_prd[:,:, 2]]
@@ -244,8 +281,33 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
 
                     vertices_prd = torch.reshape(mesh_prd, (batch, -1))
 
+                    
+                    # Silhouette Reprojection
+                    if visualise_flag == 1:
+                        mesh_cat = torch.FloatTensor([]).cuda()
+                        for view in range(0, args.num_views):
+                            rots_view = torch.zeros(batch,3).cuda()
+                            rots_view[:,0] = rots_view[:,0] + rots[:,0]
+                            rots_view[:,2] = rots_view[:,2] + rots[:,2]
+                            rots_view[:,1] = rots_view[:,1] + cam_prd[:, view]
+                            mesh_view = par_to_mesh(args.gender, rots_view, poses, betas)
+                            v_nr = scale_vert_nr_batch_forLoop(mesh_view)
+                            v_nr = mesh_view
+                            mesh_cat=torch.cat((mesh_cat, v_nr), 0)
+
+                        face=f_nr.repeat(mesh_cat.shape[0],1,1)
+                        
+                        images = n_renderer(mesh_cat, face, mode='silhouettes') # silhouettes
+                        save_images(join(parent_dic,'reprojection',phase),'epoch %d,prd'%epoch,images)
+                        save_images(join(parent_dic,'reprojection',phase),'epoch %d,gt'%epoch,inputs[:,0,:,:])
+                        visualise_flag = 0
+                    if args.reprojection_loss == 'y':
+                        sil_loss = bce_loss(images, inputs[:,0,:,:],)
+                    
 
                     # ground truth
+                    par_gt = gt[:,:82]
+                    cam_gt = gt[:,82:82+args.num_views]
                     rots, poses, betas = decompose_par(par_gt)
                     mesh_gt = par_to_mesh(args.gender, rots, poses, betas)
 
@@ -254,8 +316,11 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                     
                     vertices_gt = torch.reshape(mesh_gt, (batch, -1))
 
+                    
+                    # Loss
                     pose_loss = criterion(par_prd[:, :72], par_gt[:, :72])
                     shape_loss = criterion(par_prd[:, 72:], par_gt[:, 72:])
+                    cam_loss = criterion(cam_prd,cam_gt)
                     ver_loss = criterion(vertices_prd, vertices_gt)
                     
                     h_loss = criterion(h_prd, h_gt)
@@ -268,7 +333,10 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                     
 
                     loss = pose_loss * pose_w + shape_loss * shape_w + ver_loss * ver_w 
-                    loss += h_loss*h_w + c_loss * c_w + w_loss *w_w + n_loss*n_w + a_loss*a_w 
+                    loss = loss + h_loss*h_w + c_loss * c_w + w_loss *w_w + n_loss*n_w + a_loss*a_w
+                    loss = loss + cam_loss * 0.1
+                    if args.reprojection_loss == 'y':
+                        loss += sil_loss*1e-13  
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -281,24 +349,12 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                 running_loss_ver += ver_loss.item() * batch
                 
                 running_loss_h += h_loss.item() * batch
-                
                 running_loss_c += c_loss.item() * batch
-                
                 running_loss_w += w_loss.item() * batch
-                
                 running_loss_n += n_loss.item() * batch
                 running_loss_a += a_loss.item() * batch
+                running_loss_cam += cam_loss.item() * batch   
                 
-            '''
-            if (epoch+1) % 5 == 0:
-                print(phase, '-----------------------')
-                for k in range(2):
-                    print('Ground truth shape par')
-                    print(par_gt[k][72:].to("cpu").numpy(),)
-                    print('Prediction')
-                    print(par_prd[k][72:].to("cpu").detach().numpy(),)
-                    print()
-            '''
 
             if phase == 'train':
                 scheduler.step()
@@ -308,16 +364,18 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
             epoch_loss_pose = np.sqrt(running_loss_pose / dataset_size[phase])
             epoch_loss_shape = np.sqrt(running_loss_shape / dataset_size[phase])
             epoch_loss_ver = np.sqrt(running_loss_ver / dataset_size[phase])
-            
+            epoch_loss_cam = np.sqrt(running_loss_cam / dataset_size[phase])
+
             epoch_loss_c = 100 * np.sqrt(running_loss_c / dataset_size[phase])
             epoch_loss_w = 100 * np.sqrt(running_loss_w / dataset_size[phase])
             epoch_loss_n = 100 * np.sqrt(running_loss_n / dataset_size[phase])
             epoch_loss_a = 100 * np.sqrt(running_loss_a / dataset_size[phase])
             epoch_loss_h = 100 * np.sqrt(running_loss_h / dataset_size[phase])
-            
 
-            print('{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm{:.2f}cm H{:.2f}cm'.format(
-                phase[0], epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w, epoch_loss_n, epoch_loss_a,epoch_loss_h))
+
+
+            print('{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm{:.2f}cm H{:.2f}cm Camera {:.2f}'.format(
+                phase[0], epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w, epoch_loss_n, epoch_loss_a,epoch_loss_h, epoch_loss_cam))
             #record.write("Hello \n") 
             record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'a')
             record.writelines(
@@ -326,55 +384,13 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
             )
             record.close()
             
-            vis.line(
-                X=np.array([epoch]),
-                Y=np.array([epoch_loss_shape]),
-                name=phase+'_shape',
-                win=win_shape,
-                update='append'
-            )
-            vis.line(
-                X=np.array([epoch]),
-                Y=np.array([epoch_loss_pose]),
-                name=phase+'_pose',
-                win=win_pose_ver,
-                update='append'
-            )
-            vis.line(
-                X=np.array([epoch]),
-                Y=np.array([epoch_loss_ver]),
-                name=phase+'_ver',
-                win=win_pose_ver,
-                update='append'
-            )
-            vis.line(
-                X=np.array([epoch]),
-                Y=np.array([epoch_loss_c]),
-                name=phase+'_c',
-                win=win_cw,
-                update='append'
-            )
-            vis.line(
-                X=np.array([epoch]),
-                Y=np.array([epoch_loss_w]),
-                name=phase+'_w',
-                win=win_cw,
-                update='append'
-            )
-            vis.line(
-                X=np.array([epoch]),
-                Y=np.array([epoch_loss_n]),
-                name=phase+'_n',
-                win=win_na,
-                update='append'
-            )
-            vis.line(
-                X=np.array([epoch]),
-                Y=np.array([epoch_loss_a]),
-                name=phase+'_a',
-                win=win_na,
-                update='append'
-            )
+            vis.line(X=np.array([epoch]),Y=np.array([epoch_loss_shape]),name=phase+'_shape',win=win_shape,update='append')
+            vis.line( X=np.array([epoch]), Y=np.array([epoch_loss_pose]), name=phase+'_pose', win=win_pose_ver, update='append' )
+            vis.line( X=np.array([epoch]), Y=np.array([epoch_loss_ver]), name=phase+'_ver', win=win_pose_ver, update='append' )
+            vis.line( X=np.array([epoch]), Y=np.array([epoch_loss_c]), name=phase+'_c', win=win_cw, update='append' )
+            vis.line( X=np.array([epoch]), Y=np.array([epoch_loss_w]), name=phase+'_w', win=win_cw, update='append' )
+            vis.line( X=np.array([epoch]), Y=np.array([epoch_loss_n]), name=phase+'_n', win=win_na, update='append' )
+            vis.line( X=np.array([epoch]), Y=np.array([epoch_loss_a]), name=phase+'_a', win=win_na, update='append' )
             
             # deep copy the model
             if phase == 'val' and epoch_loss < best_loss:
@@ -393,7 +409,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
 
 
     # load best model weights
-    model.load_state_dict(best_model_wts)
+    model.load_state_dict(best_model_wts, strict=False)
     return model
 
 
@@ -406,7 +422,7 @@ def main():
     print('Gender: ', args.gender)
     print('Dataset size: ', args.dataset_size)
     print('Batch size: ', args.batch_size)
-    parent_dic = "/home/yifu/workspace/data/synthetic/noise_free"
+    parent_dic = "/home/yifu/workspace/data/synthetic/multiview"
     # parent_dic = raw_input('Data Path:')
     while os.path.exists(parent_dic)==False:
         print('Wrong data path!')
@@ -427,7 +443,7 @@ def main():
     print('Save path: ', save_path)
 
     print('-----------------------------------------------------------')
-    if raw_input('Confirm the above setting? (yes/no): ')!='yes':
+    if raw_input('Confirm the above setting? (y/n): ')!='y':
         print('Terminated')
         exit()
     print('Training starts')
@@ -435,7 +451,7 @@ def main():
 
     dataloader = load_data(args.dataset_size, parent_dic, args)
 
-    iteration = int(raw_input('Number of iterations in the neuron network: '))
+    # iteration = int(raw_input('Number of iterations in the neuron network: '))
     model = myresnet50(device, num_output=args.num_output,
                        use_pretrained=True, num_views=args.num_views,)
     criterion = nn.MSELoss()    # Mean suqared error for each element
