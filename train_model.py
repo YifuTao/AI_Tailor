@@ -96,6 +96,13 @@ def parse_args():
         type=str,
         help="whether use reprojection loss ['n']"
     )
+    parser.add_argument(
+        "--cam_loss",
+        default=0.1,
+        type=float,
+        help="camera loss [0.1]"
+    )
+
     return parser.parse_args()
 
 
@@ -334,7 +341,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
 
                     loss = pose_loss * pose_w + shape_loss * shape_w + ver_loss * ver_w 
                     loss = loss + h_loss*h_w + c_loss * c_w + w_loss *w_w + n_loss*n_w + a_loss*a_w
-                    loss = loss + cam_loss * 0.1
+                    loss = loss + cam_loss * args.cam_loss
                     if args.reprojection_loss == 'y':
                         loss += sil_loss*1e-13  
                     # backward + optimize only if in training phase
