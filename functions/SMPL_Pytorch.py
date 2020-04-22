@@ -212,6 +212,22 @@ def decompose_par(parameters):  # 82
 
     return rots, poses, betas
 
+def generate_obj(vertices,path):
+    # Write Vertices
+    with open( path, 'w') as fp:
+        for v in vertices[0]:
+            #fp.write( 'v %f %f %f\n' % ( float(v[0]),float(v[1]), float(v[2])) )
+            fp.write( 'v %f %f %f\n' % (v[0], v[1],v[2]))
+
+    # Write Face (f)
+    file1 = open('models/SMPL_f.obj')
+    content = file1.readlines()
+    file1.close()
+
+    with open(path, 'a') as fp:
+        for i,x in enumerate(content):
+            a = x[:len(x)-1].split(" ")
+            fp.write(x)
 
 def main():
 
@@ -230,7 +246,7 @@ def main():
     #print(betas)
 
 
-    Jtr,vertices = par_to_mesh(rots, poses, betas)
+    vertices = par_to_mesh(rots, poses, betas)
 
 
     outmesh_path = 'hello_smpl.obj'
@@ -254,7 +270,7 @@ def main():
             fp.write(x)
 
     ## Print message
-    print '..Output mesh saved to: ', outmesh_path
+    print('..Output mesh saved to: ', outmesh_path)
 
 if __name__ == "__main__":
     main()

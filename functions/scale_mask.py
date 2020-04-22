@@ -147,7 +147,7 @@ def main():
     parent_path = "/home/yifu/workspace/data_smpl/A_pose_5/male/noisy_original"
     path = join(parent_path,'val')
     #path = '/home/yifu/workspace/data_smpl/test'
-    print 'path: ',path
+    print('path: ',path)
     images = [f for f in listdir(path) if isfile(join(path, f))]
 
     for name in images:

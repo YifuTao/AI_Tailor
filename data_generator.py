@@ -64,10 +64,11 @@ def parse_args():
     )
     parser.add_argument(
         "--gpu",
-        default=1,
+        default=0,
         type=int,
         help="which gpu to train [1]"
     )
+
     return parser.parse_args()
 
 def generate_rots_poses_betas():
@@ -134,19 +135,19 @@ def main():
     #args.dataset_size = 10
     gender = 'male'
     print('-----------------------------------------------------------')
-    print'Gender: ', gender
+    print('Gender: ', gender)
     m = pickle.load(open('models/basicModel_%s_lbs_10_207_0_v1.0.0.pkl' % gender[0]))
     dataset_size = args.dataset_size
-    print'Dataset range:', args.start_num, ' - ', dataset_size+args.start_num-1
-    parent_dic = '/home/yifu/workspace/data/synthetic/multiview/val'
-    print 'Data Path: ',parent_dic
+    print('Dataset range:', args.start_num, ' - ', dataset_size+args.start_num-1)
+    parent_dic = '/home/yifu/Data/silhouette/val'
+    print('Data Path: ',parent_dic)
     device = torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(device)
     print('-----------------------------------------------------------')
     if raw_input('Confirm the above setting? (y/n): ')!='y':
         print('Terminated')
         exit()
-    print'Data generation starts'
+    print('Data generation starts')
     print('------------------------')
 
     for i in range(0,  dataset_size):
