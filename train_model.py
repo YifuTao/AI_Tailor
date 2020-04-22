@@ -211,8 +211,8 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
     while len(a) != 8:
         print('weights: pose shape ver h c w n a:')
         # a = [0.1, 0.1, 0.1, 0.0, 0.01, 0.01, 0.01, 0.01]  # standard
-        a = [0, 0, 0, 0, 0, 0, 0, 0]
-        # a = [float(x) for x in raw_input().split()]
+        # a = [0, 0, 0, 0, 0, 0, 0, 0]
+        a = [float(x) for x in raw_input().split()]
     pose_w = a[0]
     shape_w= a[1]
     ver_w=a[2]
@@ -481,8 +481,8 @@ def main():
     print('Gender: ', args.gender)
     print('Dataset size: ', args.dataset_size)
     print('Batch size: ', args.batch)
-    parent_dic = "/home/yifu/Data/silhouette"
-    # parent_dic = raw_input('Data Path:')
+    # parent_dic = "/home/yifu/Data/silhouette"
+    parent_dic = raw_input('Data Path:')
     while os.path.exists(parent_dic)==False:
         print('Wrong data path!')
         parent_dic = raw_input('Data Path:')  
@@ -491,7 +491,6 @@ def main():
     # save_name = 'test'
     save_name = raw_input('Name of the model weights saved:')
     weights_path = join(parent_dic,'trained_model','%s_weights'%save_name, save_name+'.pth')
-    # save_path = os.path.join(parent_dic,'trained_model', save_name+'.pth')
     
     while os.path.exists(weights_path) and save_name!='tmp':
         print('Network weights save path will overwrite existing pth file!')

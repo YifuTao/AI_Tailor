@@ -1,6 +1,15 @@
 # AI_Tailor
 
-Environment: pip install opendr,pytorch cuda 9.2
+Environment: 
+
+Pyhon 2.7
+pytorch 
+visdom
+matplotlib
+chumpy
+opencv-python
+conda install -c menpo osmesa	(or sudo apt-get install libosmesa6-dev)
+pip install opendr
 
 Use SMPL shape + pose + vertices + measurements as loss
 
