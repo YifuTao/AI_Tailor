@@ -28,9 +28,9 @@ def parse_args():
     )
     parser.add_argument(
         "--num_views",
-        default=1,
+        default=8,
         type=int,
-        help="Number of views as input [1]",
+        help="Number of views as input [8]",
     )
     parser.add_argument(
         "--start_num",
@@ -139,7 +139,7 @@ def main():
     m = pickle.load(open('models/basicModel_%s_lbs_10_207_0_v1.0.0.pkl' % gender[0]))
     dataset_size = args.dataset_size
     print('Dataset range:', args.start_num, ' - ', dataset_size+args.start_num-1)
-    parent_dic = '/home/yifu/Data/silhouette/val'
+    parent_dic = '/home/yifu/Data/2views/val'
     print('Data Path: ',parent_dic)
     device = torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(device)
@@ -165,7 +165,7 @@ def main():
         vertices = vertices.squeeze().to("cpu").numpy() # frontal view vertices
 
         # multi views
-        num_view = 8
+        num_view = args.num_views
         camera = torch.zeros(num_view).cuda()
 
         angle = 2*np.pi / num_view    

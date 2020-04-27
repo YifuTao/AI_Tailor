@@ -75,12 +75,6 @@ def parse_args():
         help="the number of output ground truth [82]"
     )
     parser.add_argument(
-        "--par_loss_weight",
-        default=1,
-        type=float,
-        help="parameter loss weight [1]"
-    )
-    parser.add_argument(
         "--gender",
         default='male',
         type=str,
@@ -115,6 +109,18 @@ def parse_args():
         default=1e-3,
         type=float,
         help="reprojection loss weight [0.001]"
+    )
+    parser.add_argument(
+        "--gtCamera",
+        default=False,
+        type=bool,
+        help="use ground truth camera pose [n]"
+    )
+    parser.add_argument(
+        "--gtPose",
+        default=False,
+        type=bool,
+        help="use ground truth human pose [n]"
     )
 
     return parser.parse_args()
@@ -332,10 +338,9 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
 
                     vertices_prd = torch.reshape(mesh_prd, (batch, -1))
 
-                    
-                    # Silhouette Reprojection
                     # -----------------------
                     # use gt pose and camera
+                    if args.gtPose == True
                     par_gt = gt[:,:82]
                     par_prd[:,:72] = par_gt[:,:72]
                     # rots_gt, poses_gt, betas_gt = decompose_par(par_gt)
@@ -351,8 +356,12 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                     
                     cam_gt = gt[:,82:82+args.num_views]
                     cam_prd = cam_gt
-                    
                     #------------------------
+
+                    
+                    # Silhouette Reprojection
+
+
                     mesh_cat = torch.FloatTensor([]).cuda()
                     for view in range(0, args.num_views):
                         rots_view = torch.zeros(batch,3).cuda()
@@ -446,11 +455,11 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
 
 
 
-            print('{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Height{:.2f}cm Camera {:.2f} Reprojction {:.2f}'.format(
+            print('{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Height{:.2f}cm Camera {:.2f}degree Reprojction {:.2f}'.format(
                 phase, epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w,epoch_loss_h, epoch_loss_cam,epoch_loss_reproj))
             record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'a')
             record.writelines(
-                '{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm {:.2f}cm Height {:.2f}cm Camera {:.2f} Reprojction {:.2f}\n'.format(
+                '{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm {:.2f}cm Height {:.2f}cm Camera {:.2f}degree Reprojction {:.2f}\n'.format(
                 phase, epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w, epoch_loss_n, epoch_loss_a,epoch_loss_h,epoch_loss_cam, epoch_loss_reproj)
             )
             time_elapsed = time.time() - checkpoint
