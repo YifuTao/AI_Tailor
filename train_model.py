@@ -328,8 +328,16 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                     # prediction
                     prediction = model(inputs)
                     par_prd = prediction[:,:82]
-                    cam_prd = prediction[:,82:82+args.num_views]
+                    # use gt pose and camera
+                    if args.gtPose == True:
+                        par_gt_tmp = gt[:,:82]
+                        par_prd[:,:72] = par_gt_tmp[:,:72]  # replace prd pose with gt pose
                     rots, poses, betas = decompose_par(par_prd)
+
+                    cam_prd = prediction[:,82:82+args.num_views]
+                    if args.gtCamera == True:
+                        cam_gt_tmp = gt[:,82:82+args.num_views]
+                        cam_prd = cam_gt_tmp
                 
                     mesh_prd = par_to_mesh(args.gender, rots, poses, betas)
 
@@ -338,29 +346,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
 
                     vertices_prd = torch.reshape(mesh_prd, (batch, -1))
 
-                    # -----------------------
-                    # use gt pose and camera
-                    if args.gtPose == True
-                    par_gt = gt[:,:82]
-                    par_prd[:,:72] = par_gt[:,:72]
-                    # rots_gt, poses_gt, betas_gt = decompose_par(par_gt)
-                    rots, poses, betas = decompose_par(par_prd)
-                    mesh_prd = par_to_mesh(args.gender, rots, poses, betas)
-
-                    X, Y, Z = [mesh_prd[:,:, 0], mesh_prd[:,:, 1], mesh_prd[:,:, 2]]
-                    h_prd, w_prd, c_prd, n_prd, a_prd = vertex2measurements(X, Y, Z)
-
-                    vertices_prd = torch.reshape(mesh_prd, (batch, -1))
-                    # poses = poses_gt   # pose is gt, shape is prd
-                    # rots = rots_gt
-                    
-                    cam_gt = gt[:,82:82+args.num_views]
-                    cam_prd = cam_gt
-                    #------------------------
-
-                    
                     # Silhouette Reprojection
-
 
                     mesh_cat = torch.FloatTensor([]).cuda()
                     for view in range(0, args.num_views):
