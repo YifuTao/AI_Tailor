@@ -9,7 +9,7 @@
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            "args":["--dataset_size","20","--batch","3","--num_views","3","--gpu","0","--reprojection_loss","y"],
+            "args":["--dataset_size","500","--batch","3","--num_views","2","--gpu","0","--reprojection_loss","True","--gtCamera","True","--gtPose","True", "--lr","1"],
             "program": "${file}",
             "console": "integratedTerminal"
         }

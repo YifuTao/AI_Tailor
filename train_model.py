@@ -88,9 +88,9 @@ def parse_args():
     )
     parser.add_argument(
         "--reprojection_loss",
-        default='n',
-        type=str,
-        help="whether use reprojection loss ['n']"
+        default=False,
+        type=bool,
+        help="whether use reprojection loss [False]"
     )
     parser.add_argument(
         "--cam_loss",
@@ -100,9 +100,9 @@ def parse_args():
     )
     parser.add_argument(
         "--visdom",
-        default='off',
-        type=str,
-        help="switch on/off visdom [off]"
+        default=False,
+        type=bool,
+        help="switch on/off visdom [False]"
     )
     parser.add_argument(
         "--reprojection_loss_weight",
@@ -242,7 +242,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
     record.write('\n')
     record.close()
 
-    if args.visdom == 'on':
+    if args.visdom == True:
         vis, win_shape, win_pose_ver, win_cw, win_na = visdom_init(a)
 
     num_epochs = args.num_epochs
@@ -400,7 +400,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                     loss = pose_loss * pose_w + shape_loss * shape_w + ver_loss * ver_w 
                     loss = loss + h_loss*h_w + c_loss * c_w + w_loss *w_w + n_loss*n_w + a_loss*a_w
                     loss = loss + cam_loss * args.cam_loss
-                    if args.reprojection_loss == 'y':
+                    if args.reprojection_loss == True:
                         loss = loss + sil_loss*args.reprojection_loss_weight  
                     # backward + optimize only if in training phase
                     if phase == 'train':
@@ -454,7 +454,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
             record.writelines('Computation Time:{:.0f}m {:.0f}s\n'.format(time_elapsed // 60, time_elapsed % 60))
             record.close()
 
-            if args.visdom == 'on':
+            if args.visdom == True:
                 vis=visdom_append(vis, epoch,epoch_loss_shape,epoch_loss_pose,epoch_loss_ver,epoch_loss_c,epoch_loss_w,epoch_loss_n,epoch_loss_a,phase,
                                     win_shape,win_pose_ver,win_cw,win_na)
             
@@ -488,7 +488,7 @@ def main():
     device = torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(device)
     print('-----------------------------------------------------------')
-    if args.reprojection_loss =='n':
+    if args.reprojection_loss ==False:
         args.reprojection_loss_weight = 0
     print(args)
     print('Gender: ', args.gender)
