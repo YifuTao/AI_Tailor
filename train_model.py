@@ -155,7 +155,7 @@ def load_data(total_dataset_size, parent_dic, args):
     return dataloader
 
 
-def myresnet50(device, num_output=82, use_pretrained=True, num_views=1):
+def predictor(device, num_output=82, use_pretrained=True, num_views=1):
 
     import resnet_multi_view
     model = resnet_multi_view.resnet50(
@@ -170,6 +170,25 @@ def myresnet50(device, num_output=82, use_pretrained=True, num_views=1):
 
     model = model.to(device)
     # model = nn.DataParallel(model)     # multi GPU
+    return model
+
+def updater_cam(device, num_output=1, use_pretrained=True, num_views=1):
+
+    import resnet_6channels
+    model = resnet_6channels.resnet50(
+        pretrained=use_pretrained,
+    )
+    num_ftrs = model.fc.in_features # * num_views
+    model.fc = nn.Linear(num_ftrs, num_output)
+    weight = model.conv1.weight.clone()
+    model.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+    with torch.no_grad():
+        model.conv1.weight[:,:3] = weight
+        model.conv1.weight[:,3:] = weight
+
+
+    model = model.to(device)
     return model
 
 def three_channel(imgs): # make an image three identical channel 
@@ -205,7 +224,25 @@ def visdom_append(vis, epoch,epoch_loss_shape,epoch_loss_pose,epoch_loss_ver,epo
     vis.line( X=np.array([epoch]), Y=np.array([epoch_loss_a]), name=phase+'_a', win=win_na, update='append' )
     return vis
 
-def train_model(parent_dic, save_name, vis_title, device, model, dataloader, criterion, optimiser, scheduler, args,):
+def reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer):
+
+    mesh_cat = torch.FloatTensor([]).cuda()
+    for view in range(0, args.num_views):
+        rots_view = torch.zeros(batch,3).cuda()
+        rots_view[:,0] = rots_view[:,0] + rots[:,0]
+        rots_view[:,2] = rots_view[:,2] + rots[:,2]
+        rots_view[:,1] = rots_view[:,1] + cam_prd[:, view]
+        mesh_view = par_to_mesh(args.gender, rots_view, poses, betas)
+        v_nr = scale_vert_nr_batch_forLoop(mesh_view)
+        v_nr = mesh_view
+        mesh_cat=torch.cat((mesh_cat, v_nr), 0)
+
+    face=f_nr.repeat(mesh_cat.shape[0],1,1)
+    images = n_renderer(mesh_cat, face, mode='silhouettes') # silhouettes
+    return images
+
+
+def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam, dataloader, criterion, optimiser, scheduler, args,):
     import time
     import copy
     
@@ -217,8 +254,8 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
     while len(a) != 8:
         print('weights: pose shape ver h c w n a:')
         # a = [0.1, 0.1, 0.1, 0.0, 0.01, 0.01, 0.01, 0.01]  # standard
-        # a = [0, 0, 0, 0, 0, 0, 0, 0]
-        a = [float(x) for x in raw_input().split()]
+        a = [0, 0, 0, 0, 0, 0, 0, 0]
+        # a = [float(x) for x in raw_input().split()]
     pose_w = a[0]
     shape_w= a[1]
     ver_w=a[2]
@@ -246,7 +283,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
         vis, win_shape, win_pose_ver, win_cw, win_na = visdom_init(a)
 
     num_epochs = args.num_epochs
-    best_model_wts = copy.deepcopy(model.state_dict())
+    best_model_wts = copy.deepcopy(predictor.state_dict())
     best_loss = float("inf")
     n_renderer = nr.Renderer(image_size=300, perspective=False, camera_mode='look_at')
     m = pickle.load(open('models/basicModel_%s_lbs_10_207_0_v1.0.0.pkl' % args.gender[0]))
@@ -277,9 +314,11 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
         for phase in ['train', 'val']:
             if phase == 'train':
                 #scheduler.step()
-                model.train()  # Set model to training mode
+                predictor.train()  # Set model to training mode
+                updater_cam.train()
             else:
-                model.eval()   # Set model to evaluate mode
+                predictor.eval()   # Set model to evaluate mode
+                updater_cam.eval()
             
             visualise_flag = 1
 
@@ -294,6 +333,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
             running_loss_a = 0.0
             running_loss_cam = 0.0
             running_loss_reproj = 0.0
+            running_loss_cam_delta = 0.0
 
             # Iterate over data.
             for index, imgs, gt in dataloader[phase]:
@@ -326,7 +366,8 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                 with torch.set_grad_enabled(phase == 'train'):
                     # torch.autograd.set_detect_anomaly(True)
                     # prediction
-                    prediction = model(inputs)
+                    prediction = predictor(inputs)
+                    
                     par_prd = prediction[:,:82]
                     # use gt pose and camera
                     if args.gtPose == True:
@@ -347,7 +388,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                     vertices_prd = torch.reshape(mesh_prd, (batch, -1))
 
                     # Silhouette Reprojection
-
+                    '''
                     mesh_cat = torch.FloatTensor([]).cuda()
                     for view in range(0, args.num_views):
                         rots_view = torch.zeros(batch,3).cuda()
@@ -358,10 +399,13 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                         v_nr = scale_vert_nr_batch_forLoop(mesh_view)
                         v_nr = mesh_view
                         mesh_cat=torch.cat((mesh_cat, v_nr), 0)
+                    
 
                     face=f_nr.repeat(mesh_cat.shape[0],1,1)
                     # generate_obj(mesh_view,join(reproj_path,phase,'epoch %d,prd.obj'%epoch))
                     images = n_renderer(mesh_cat, face, mode='silhouettes') # silhouettes
+                    '''
+                    images = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
                     # sil_loss = bce_loss(images, inputs[:,0,:,:],)
                     sil_loss = l2_loss(images, inputs[:,0,:,:],)
                     if visualise_flag == 1:
@@ -369,19 +413,31 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                         save_images(join(reproj_path,phase),'epoch %d,gt'%epoch,inputs[:,0,:,:])
                         visualise_flag = 0
                     
+                    images = torch.unsqueeze(images,1)
+                    
+                    
                     
 
                     # ground truth
                     par_gt = gt[:,:82]
                     cam_gt = gt[:,82:82+args.num_views]
-                    rots, poses, betas = decompose_par(par_gt)
-                    mesh_gt = par_to_mesh(args.gender, rots, poses, betas)
+                    rots_gt, poses_gt, betas_gt = decompose_par(par_gt)
+                    mesh_gt = par_to_mesh(args.gender, rots_gt, poses_gt, betas_gt)
 
-                    X, Y, Z = [mesh_gt[:,:, 0], mesh_gt[:,:, 1], mesh_gt[:,:, 2]]
-                    h_gt, w_gt, c_gt, n_gt, a_gt = vertex2measurements(X, Y, Z)
+                    X_gt, Y_gt, Z_gt = [mesh_gt[:,:, 0], mesh_gt[:,:, 1], mesh_gt[:,:, 2]]
+                    h_gt, w_gt, c_gt, n_gt, a_gt = vertex2measurements(X_gt, Y_gt, Z_gt)
                     
                     vertices_gt = torch.reshape(mesh_gt, (batch, -1))
 
+                    # refinement
+                    reprojections = images.repeat(1,3,1,1)
+                    cat_input = torch.cat((inputs,reprojections),1)
+                    cam_delta = updater_cam(cat_input)
+                    cam_delta= torch.t(torch.reshape(cam_delta,(args.num_views,batch)))
+                    cam_prd = cam_prd + cam_delta
+                    cam_delta_loss = criterion(cam_prd,cam_gt)
+                    images = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
+                    sil_delta_loss = l2_loss(images, inputs[:,0,:,:],)
                     
                     # Loss
                     pose_loss = criterion(par_prd[:, :72], par_gt[:, :72])
@@ -401,7 +457,11 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                     loss = loss + h_loss*h_w + c_loss * c_w + w_loss *w_w + n_loss*n_w + a_loss*a_w
                     loss = loss + cam_loss * args.cam_loss
                     if args.reprojection_loss == True:
-                        loss = loss + sil_loss*args.reprojection_loss_weight  
+                        loss = loss + sil_loss*args.reprojection_loss_weight
+                    loss = loss + cam_delta_loss * args.cam_loss + sil_delta_loss*args.reprojection_loss_weight
+
+                    
+
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -420,7 +480,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
                 running_loss_a += a_loss.item() * batch
                 running_loss_cam += cam_loss.item() * batch
                 running_loss_reproj += sil_loss.item() * batch   
-                
+                running_loss_cam_delta += cam_delta_loss.item() * batch
 
             if phase == 'train':
                 scheduler.step()
@@ -432,6 +492,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
             epoch_loss_ver = np.sqrt(running_loss_ver / dataset_size[phase])
             epoch_loss_cam = 180/np.pi * np.sqrt(running_loss_cam / dataset_size[phase])
             epoch_loss_reproj = np.sqrt(running_loss_reproj / dataset_size[phase])
+            epoch_loss_cam_delta = 180/np.pi * np.sqrt(running_loss_cam_delta / dataset_size[phase])
 
             epoch_loss_c = 100 * np.sqrt(running_loss_c / dataset_size[phase])
             epoch_loss_w = 100 * np.sqrt(running_loss_w / dataset_size[phase])
@@ -443,6 +504,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
 
             print('{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Height{:.2f}cm Camera {:.2f}degree Reprojction {:.2f}'.format(
                 phase, epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w,epoch_loss_h, epoch_loss_cam,epoch_loss_reproj))
+            print('Camera loss %4f Camera loss after update %.4f'%(epoch_loss_cam,epoch_loss_cam_delta))
             record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'a')
             record.writelines(
                 '{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm {:.2f}cm Height {:.2f}cm Camera {:.2f}degree Reprojction {:.2f}\n'.format(
@@ -461,7 +523,7 @@ def train_model(parent_dic, save_name, vis_title, device, model, dataloader, cri
             # deep copy the model
             if phase == 'val' and epoch_loss < best_loss:
                 best_loss = epoch_loss
-                best_model_wts = copy.deepcopy(model.state_dict())
+                best_model_wts = copy.deepcopy(predictor.state_dict())
             torch.save(best_model_wts, join(weights_path, save_name+'.pth'))
             if (epoch+1) % 5 == 0:
                 torch.save(best_model_wts, join(weights_path, save_name+'_epoch_%d.pth'%epoch))
@@ -524,14 +586,15 @@ def main():
     dataloader = load_data(args.dataset_size, parent_dic, args)
 
     # iteration = int(raw_input('Number of iterations in the neuron network: '))
-    model = myresnet50(device, num_output=args.num_output,
+    predictor_ = predictor(device, num_output=args.num_output,
                        use_pretrained=True, num_views=args.num_views,)
+    updater_cam_ = updater_cam(device, num_output=1, use_pretrained=True, num_views=args.num_views)
     criterion = nn.MSELoss()    # Mean suqared error for each element
-    optimiser = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
+    optimiser = optim.SGD(predictor_.parameters(), lr=args.lr, momentum=0.9)
     exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=10, gamma=0.1)
 
     vis_title = save_name
-    model = train_model(parent_dic, save_name, vis_title, device, model, dataloader, criterion,
+    model = train_model(parent_dic, save_name, vis_title, device, predictor_, updater_cam_, dataloader, criterion,
                         optimiser, exp_lr_scheduler, args)
 
 
