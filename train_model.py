@@ -455,9 +455,10 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     # refinement
                     reprojections = images.repeat(1,3,1,1)
                     cat_input = torch.cat((inputs,reprojections),1)
+                    cat_input = torch.detach(cat_input)
                     cam_delta = updater_cam(cat_input)
                     cam_delta= torch.t(torch.reshape(cam_delta,(args.num_views,batch)))
-                    cam_prd = cam_prd + cam_delta
+                    cam_prd = torch.detach(cam_prd) + cam_delta
                     cam_delta_loss = criterion(cam_prd,cam_gt)
                     images = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
                     sil_delta_loss = l2_loss(images, inputs[:,0,:,:],)
@@ -541,8 +542,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     record.close()
 
     # load best model weights
-    model.load_state_dict(best_model_wts, strict=False)
-    return model
+    predictor.load_state_dict(best_model_wts, strict=False)
+    return predictor
 
 
 def main():
