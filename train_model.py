@@ -429,15 +429,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     
                     vertices_gt = torch.reshape(mesh_gt, (batch, -1))
 
-                    # refinement
-                    reprojections = images.repeat(1,3,1,1)
-                    cat_input = torch.cat((inputs,reprojections),1)
-                    cam_delta = updater_cam(cat_input)
-                    cam_delta= torch.t(torch.reshape(cam_delta,(args.num_views,batch)))
-                    cam_prd = cam_prd + cam_delta
-                    cam_delta_loss = criterion(cam_prd,cam_gt)
-                    images = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
-                    sil_delta_loss = l2_loss(images, inputs[:,0,:,:],)
+                    
                     
                     # Loss
                     pose_loss = criterion(par_prd[:, :72], par_gt[:, :72])
@@ -458,9 +450,18 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     loss = loss + cam_loss * args.cam_loss
                     if args.reprojection_loss == True:
                         loss = loss + sil_loss*args.reprojection_loss_weight
-                    loss = loss + cam_delta_loss * args.cam_loss + sil_delta_loss*args.reprojection_loss_weight
-
                     
+
+                    # refinement
+                    reprojections = images.repeat(1,3,1,1)
+                    cat_input = torch.cat((inputs,reprojections),1)
+                    cam_delta = updater_cam(cat_input)
+                    cam_delta= torch.t(torch.reshape(cam_delta,(args.num_views,batch)))
+                    cam_prd = cam_prd + cam_delta
+                    cam_delta_loss = criterion(cam_prd,cam_gt)
+                    images = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
+                    sil_delta_loss = l2_loss(images, inputs[:,0,:,:],)
+                    loss = loss + cam_delta_loss * args.cam_loss + sil_delta_loss*args.reprojection_loss_weight
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
