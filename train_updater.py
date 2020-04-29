@@ -311,13 +311,12 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
         visualise_flag = 1
 
         # Each epoch has a training and validation phase
+        predictor.eval()
         for phase in ['train', 'val']:
             if phase == 'train':
                 #scheduler.step()
-                predictor.train()  # Set model to training mode
                 updater_cam.train()
             else:
-                predictor.eval()   # Set model to evaluate mode
                 updater_cam.eval()
             
             visualise_flag = 1
@@ -445,11 +444,11 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     n_loss = criterion(n_prd, n_gt)
                     a_loss = criterion(a_prd, a_gt)
                     
-                    loss = pose_loss * pose_w + shape_loss * shape_w + ver_loss * ver_w 
-                    loss = loss + h_loss*h_w + c_loss * c_w + w_loss *w_w + n_loss*n_w + a_loss*a_w
-                    loss = loss + cam_loss * args.cam_loss
-                    if args.reprojection_loss == True:
-                        loss = loss + sil_loss*args.reprojection_loss_weight
+                    # loss = pose_loss * pose_w + shape_loss * shape_w + ver_loss * ver_w 
+                    # loss = loss + h_loss*h_w + c_loss * c_w + w_loss *w_w + n_loss*n_w + a_loss*a_w
+                    # loss = loss + cam_loss * args.cam_loss
+                    # if args.reprojection_loss == True:
+                    #    loss = loss + sil_loss*args.reprojection_loss_weight
                     
 
                     # refinement
@@ -462,7 +461,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     cam_delta_loss = criterion(cam_prd_,cam_gt)
                     # images_ = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
                     # sil_delta_loss = l2_loss(images_, inputs[:,0,:,:],)
-                    # loss = loss + cam_delta_loss * 0.1#  args.cam_loss # + sil_delta_loss*args.reprojection_loss_weight
+                    loss = 0
+                    loss = loss+  cam_delta_loss * .5#  args.cam_loss # + sil_delta_loss*args.reprojection_loss_weight
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
@@ -590,6 +590,8 @@ def main():
     # iteration = int(raw_input('Number of iterations in the neuron network: '))
     predictor_ = predictor(device, num_output=args.num_output,
                        use_pretrained=True, num_views=args.num_views,)
+    save_path = '/home/yifu/Data/silhouette/trained_model/500_onlyreproj_gtpose_weights/500_onlyreproj_gtpose.pth'
+    predictor_.load_state_dict(torch.load(save_path))
     updater_cam_ = updater_cam(device, num_output=1, use_pretrained=True, num_views=args.num_views)
     criterion = nn.MSELoss()    # Mean suqared error for each element
     optimiser = optim.SGD(predictor_.parameters(), lr=args.lr, momentum=0.9)
