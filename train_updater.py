@@ -491,7 +491,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                 running_loss_a += a_loss.item() * batch
                 running_loss_cam += cam_loss.item() * batch
                 running_loss_reproj += sil_loss.item() * batch   
-                running_loss_cam_delta += cam_delta_loss.item() * batch
+                running_loss_cam_delta += cam_delta_loss[0].item() * batch
 
             if phase == 'train':
                 scheduler.step()
@@ -599,7 +599,7 @@ def main():
     # iteration = int(raw_input('Number of iterations in the neuron network: '))
     predictor_ = predictor(device, num_output=args.num_output,
                        use_pretrained=True, num_views=args.num_views,)
-    save_path = raw_input('predictor model save path')
+    save_path = raw_input('predictor model save path:')
     # save_path = '/home/yifu/Data/silhouette/trained_model/500_onlyreproj_gtpose_weights/500_onlyreproj_gtpose.pth'
     predictor_.load_state_dict(torch.load(save_path))
     updater_cam_ = updater_cam(device, num_output=1, use_pretrained=True, num_views=args.num_views)
