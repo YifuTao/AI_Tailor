@@ -122,6 +122,12 @@ def parse_args():
         type=bool,
         help="use ground truth human pose [n]"
     )
+    parser.add_argument(
+        "--iteration",
+        default=1,
+        type=int,
+        help=" [n]"
+    )
 
     return parser.parse_args()
 
@@ -452,17 +458,20 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     
 
                     # refinement
-                    reprojections = images.repeat(1,3,1,1)
-                    cat_input = torch.cat((inputs,reprojections),1)
-                    cat_input = torch.detach(cat_input)
-                    cam_delta = updater_cam(cat_input)
-                    cam_delta= torch.t(torch.reshape(cam_delta,(args.num_views,batch)))
-                    cam_prd_ = torch.detach(cam_prd) + cam_delta
-                    cam_delta_loss = criterion(cam_prd_,cam_gt)
-                    # images_ = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
-                    # sil_delta_loss = l2_loss(images_, inputs[:,0,:,:],)
                     loss = 0
-                    loss = loss+  cam_delta_loss * .5#  args.cam_loss # + sil_delta_loss*args.reprojection_loss_weight
+                    cam_delta_loss = torch.zeros(args.iteration).cuda()
+                    for iteration in range(0, args.iteration):
+                        reprojections = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
+                        reprojections = torch.unsqueeze(reprojections,1).repeat(1,3,1,1)
+                        cat_input = torch.cat((inputs,reprojections),1)
+                        cat_input = torch.detach(cat_input)
+                        cam_delta = updater_cam(cat_input)
+                        cam_delta= torch.t(torch.reshape(cam_delta,(args.num_views,batch)))
+                        cam_prd_ = torch.detach(cam_prd) + cam_delta
+                        cam_delta_loss[iteration] = criterion(cam_prd_,cam_gt)
+                        # images_ = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
+                        # sil_delta_loss = l2_loss(images_, inputs[:,0,:,:],)
+                        loss = loss +  cam_delta_loss[iteration] * .5#  args.cam_loss # + sil_delta_loss*args.reprojection_loss_weight
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
@@ -590,7 +599,8 @@ def main():
     # iteration = int(raw_input('Number of iterations in the neuron network: '))
     predictor_ = predictor(device, num_output=args.num_output,
                        use_pretrained=True, num_views=args.num_views,)
-    save_path = '/home/yifu/Data/silhouette/trained_model/500_onlyreproj_gtpose_weights/500_onlyreproj_gtpose.pth'
+    save_path = raw_input('predictor model save path')
+    # save_path = '/home/yifu/Data/silhouette/trained_model/500_onlyreproj_gtpose_weights/500_onlyreproj_gtpose.pth'
     predictor_.load_state_dict(torch.load(save_path))
     updater_cam_ = updater_cam(device, num_output=1, use_pretrained=True, num_views=args.num_views)
     criterion = nn.MSELoss()    # Mean suqared error for each element
