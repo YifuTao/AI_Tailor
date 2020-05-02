@@ -27,14 +27,14 @@ def parse_args():
     import argparse
     parser = argparse.ArgumentParser(description="train a model")
     parser.add_argument(
-        "--num_epochs",
+        "--epochs",
         default=25,
         type=int,
         help="Total number of epochs for training [25]",
     )
     parser.add_argument(
         "--batch",
-        default=13,
+        default=3,
         type=int,
         help="Batch size [10]",
     )
@@ -58,7 +58,7 @@ def parse_args():
     )
     parser.add_argument(
         "--num_views",
-        default=8,
+        default=2,
         type=int,
         help="Number of views as input [8]",
     )
@@ -160,14 +160,21 @@ def predictor(device, num_output=82, use_pretrained=True, num_views=1):
     import resnet_multi_view
     model = resnet_multi_view.resnet50(
         pretrained=use_pretrained, num_views=num_views)
+    
     #model = torchvision.models.resnet50(pretrained=use_pretrained)
     num_ftrs = model.fc.in_features # * num_views
 
     # print(num_ftrs)    # 2048 : features
     # print(model.fc.out_features)   #1000 resnet deafult: number of output classes
     # change output number of classes
+    
     model.fc = nn.Linear(num_ftrs, num_output)
 
+    weight = model.conv1.weight.clone()
+    model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+    with torch.no_grad():
+        model.conv1.weight[:] = torch.unsqueeze(weight[:,0],1)
     model = model.to(device)
     # model = nn.DataParallel(model)     # multi GPU
     return model
@@ -282,7 +289,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     if args.visdom == True:
         vis, win_shape, win_pose_ver, win_cw, win_na = visdom_init(a)
 
-    num_epochs = args.num_epochs
+    num_epochs = args.epochs
     best_model_wts = copy.deepcopy(predictor.state_dict())
     best_loss = float("inf")
     n_renderer = nr.Renderer(image_size=300, perspective=False, camera_mode='look_at')
@@ -349,7 +356,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     #print (torch.all(torch.eq(test[k][:,0,:,:],imgs[k][:,0,:,:])))
                     #print(torch.all(torch.eq(test[k],imgs[k])))
                     '''
-                    imgs[k]=three_channel(imgs[k])
+                    # imgs[k]=three_channel(imgs[k])    # three channel or one channel
                     inputs = torch.cat((inputs, imgs[k]), 0)
                 inputs = inputs.to(device)
 
@@ -453,6 +460,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     
 
                     # refinement
+                    '''
                     reprojections = images.repeat(1,3,1,1)
                     cat_input = torch.cat((inputs,reprojections),1)
                     cat_input = torch.detach(cat_input)
@@ -463,7 +471,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     # images_ = reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer)
                     # sil_delta_loss = l2_loss(images_, inputs[:,0,:,:],)
                     # loss = loss + cam_delta_loss * 0.1#  args.cam_loss # + sil_delta_loss*args.reprojection_loss_weight
-
+                    '''
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -482,7 +490,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                 running_loss_a += a_loss.item() * batch
                 running_loss_cam += cam_loss.item() * batch
                 running_loss_reproj += sil_loss.item() * batch   
-                running_loss_cam_delta += cam_delta_loss.item() * batch
+                # running_loss_cam_delta += cam_delta_loss.item() * batch
 
             if phase == 'train':
                 scheduler.step()
@@ -494,7 +502,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
             epoch_loss_ver = np.sqrt(running_loss_ver / dataset_size[phase])
             epoch_loss_cam = 180/np.pi * np.sqrt(running_loss_cam / dataset_size[phase])
             epoch_loss_reproj = np.sqrt(running_loss_reproj / dataset_size[phase])
-            epoch_loss_cam_delta = 180/np.pi * np.sqrt(running_loss_cam_delta / dataset_size[phase])
+            # epoch_loss_cam_delta = 180/np.pi * np.sqrt(running_loss_cam_delta / dataset_size[phase])
 
             epoch_loss_c = 100 * np.sqrt(running_loss_c / dataset_size[phase])
             epoch_loss_w = 100 * np.sqrt(running_loss_w / dataset_size[phase])
@@ -506,7 +514,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
 
             print('{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Height{:.2f}cm Camera {:.2f}degree Reprojction {:.2f}'.format(
                 phase, epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w,epoch_loss_h, epoch_loss_cam,epoch_loss_reproj))
-            print('Camera loss %4f Camera loss after update %.4f'%(epoch_loss_cam,epoch_loss_cam_delta))
+            
             record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'a')
             record.writelines(
                 '{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm {:.2f}cm Height {:.2f}cm Camera {:.2f}degree Reprojction {:.2f}\n'.format(
@@ -558,8 +566,8 @@ def main():
     print('Gender: ', args.gender)
     print('Dataset size: ', args.dataset_size)
     print('Batch size: ', args.batch)
-    # parent_dic = "/home/yifu/Data/silhouette"
-    parent_dic = raw_input('Data Path:')
+    parent_dic = "/home/yifu/Data/silhouette"
+    # parent_dic = raw_input('Data Path:')
     while os.path.exists(parent_dic)==False:
         print('Wrong data path!')
         parent_dic = raw_input('Data Path:')  
@@ -593,7 +601,7 @@ def main():
     updater_cam_ = updater_cam(device, num_output=1, use_pretrained=True, num_views=args.num_views)
     criterion = nn.MSELoss()    # Mean suqared error for each element
     optimiser = optim.SGD(predictor_.parameters(), lr=args.lr, momentum=0.9)
-    exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=10, gamma=0.1)
+    exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=30, gamma=0.8)
 
     vis_title = save_name
     model = train_model(parent_dic, save_name, vis_title, device, predictor_, updater_cam_, dataloader, criterion,
