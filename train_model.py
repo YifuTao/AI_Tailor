@@ -460,6 +460,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     
 
                     # refinement
+                    
                     '''
                     reprojections = images.repeat(1,3,1,1)
                     cat_input = torch.cat((inputs,reprojections),1)

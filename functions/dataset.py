@@ -34,12 +34,48 @@ class HumanTestSet(data.Dataset):
             img_name = os.path.join(self.root, '%d_%d.png' % (index,i))    #image
             img = Image.open(img_name)
             imgs.append(self.transform(img))
-        
-
-        
 
         return index,imgs,par     #return imgs and label
 
 
 
-    
+class UpdateSet(data.Dataset):
+    def __init__(self, root,data_size,reproj_round, transform=None, num_views=1,normalise_scale=1):
+        #super(HumanTestSet, self).__init__()
+        #super(HumanTestSet, self).__init__(root, data_size, transform)
+        self.root = root
+        self.transform = transform
+        self.data_size = data_size    # train/val
+        self.normalise_scale = normalise_scale
+        self.num_views = num_views
+        self.reproj_round = reproj_round
+
+    def __len__(self):
+        return self.data_size 
+
+    def __getitem__(self, index):
+        #parameters
+        par_name = os.path.join(self.root, '%d' % index) 
+        infile = open(par_name, 'rb')
+        par = pickle.load(infile)
+        #par = pickle.load(infile, encoding='latin1') #pickle in py2 but using py3 now
+        infile.close()
+
+        # image
+        imgs=[]
+        reproj = []
+
+        for i in range(0,self.num_views):
+            img_name = os.path.join(self.root, '%d_%d.png' % (index,i))    #image
+            img = Image.open(img_name)
+            imgs.append(self.transform(img))
+        
+        for j in range(0,self.reproj_round):
+            for i in range(0,self.num_views):
+                img_name = os.path.join(self.root, '%d_%d_reproj_%d.png' % (index,i,j))    #image
+                img = Image.open(img_name)
+                reproj.append(self.transform(img))
+
+        
+
+        return index,imgs,reproj,par     #return imgs and label
