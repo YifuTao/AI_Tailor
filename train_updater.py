@@ -349,7 +349,10 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
 
         visualise_flag = 1
         every_epoch = args.update_period
-        reproj_round = int(epoch/every_epoch)
+        if epoch == 0:
+            reproj_round = 0
+        else:
+            reproj_round = int((epoch-1)/every_epoch)+1
         dataloader = load_data_updater(args.dataset_size, data_path,reproj_round, args)
 
         # Each epoch has a training and validation phase
@@ -461,7 +464,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     
                     #print(index)
                     #save_images('/home/yifu/Data/silhouette/update/test','input',inputs[:,0,:,:])
-                    if epoch!=0:
+                    if reproj_round!=0:
                         # save_images('/home/yifu/Data/silhouette/update/test','reproj',input_reproj[:,0,:,:])
                         input_reproj_ = torch.chunk(input_reproj,reproj_round,0)
                     for r in range(0,reproj_round):
@@ -480,11 +483,12 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         # loss = loss + cam_delta_loss[i]*0.01
                         loss = loss + reproj_delta_loss[r]*0.001
 
-                    update_path = '/home/yifu/Data/silhouette/update/%s'%phase
+                    #update_path = '/home/yifu/Data/silhouette/%s'%phase
+                    update_path = join(parent_dic,phase)
                     if epoch%every_epoch == 0:
                         save_update_images(update_path, reproj_round,inputs[:,0,:,:], reprojections,index,batch,args.num_views)
                     
-                    if epoch == 0:
+                    if reproj_round == 0:
                         continue
                     
                     # Loss ------------------------------------------------
@@ -686,7 +690,9 @@ def main():
     print('Dataset size: ', args.dataset_size)
     print('Batch size: ', args.batch)
     parent_dic = "/home/yifu/Data/silhouette"
+    # parent_dic ='/scratch/local/ssd/yifu/Data/silhouette'
     # parent_dic = raw_input('Data Path:')
+    
     while os.path.exists(parent_dic)==False:
         print('Wrong data path!')
         parent_dic = raw_input('Data Path:')  
@@ -713,7 +719,8 @@ def main():
     
 
     #dataloader = load_data(args.dataset_size, parent_dic, args)
-    data_path = '/home/yifu/Data/silhouette'
+    # data_path = '/home/yifu/Data/silhouette'
+    # data_path = '/scratch/local/ssd/yifu/Data/silhouette/'
     
     # iteration = int(raw_input('Number of iterations in the neuron network: '))
     predictor_ = predictor(device, num_output=args.num_output,
@@ -728,7 +735,7 @@ def main():
     exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=10, gamma=0.1)
 
     vis_title = save_name
-    model = train_model(parent_dic, save_name, vis_title, device, predictor_, updater_cam_, data_path, criterion,
+    model = train_model(parent_dic, save_name, vis_title, device, predictor_, updater_cam_, parent_dic, criterion,
                         optimiser, exp_lr_scheduler, args)
 
 
