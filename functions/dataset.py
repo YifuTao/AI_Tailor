@@ -64,6 +64,7 @@ class UpdateSet(data.Dataset):
         # image
         imgs=[]
         reproj = []
+        par_update = []
 
         for i in range(0,self.num_views):
             img_name = os.path.join(self.root, '%d_%d.png' % (index,i))    #image
@@ -71,6 +72,11 @@ class UpdateSet(data.Dataset):
             imgs.append(self.transform(img))
         
         for j in range(0,self.reproj_round):
+            pickle_path = os.path.join(self.root, '%d_reproj_%d'%(index,j))
+            infile = open(pickle_path, 'rb')
+            param_upd = pickle.load(infile)
+            infile.close()
+            par_update.append(param_upd)
             for i in range(0,self.num_views):
                 img_name = os.path.join(self.root, '%d_%d_reproj_%d.png' % (index,i,j))    #image
                 img = Image.open(img_name)
@@ -78,4 +84,4 @@ class UpdateSet(data.Dataset):
 
         
 
-        return index,imgs,reproj,par     #return imgs and label
+        return index,imgs,reproj,par, par_update     #return imgs and label

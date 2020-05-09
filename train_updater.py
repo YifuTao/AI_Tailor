@@ -292,7 +292,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     while len(a) != 8:
         print('weights: pose shape ver h c w n a:')
         # a = [0.1, 0.1, 0.1, 0.0, 0.01, 0.01, 0.01, 0.01]  # standard
-        a = [0, 0, 0, 0, 0, 0, 0, 0]
+        a = [0.1, 0.1, 0, 0, 0, 0, 0, 0]
         # a = [float(x) for x in raw_input().split()]
     pose_w = a[0]
     shape_w= a[1]
@@ -305,6 +305,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     print('Parameter Weights')
     print('Pose %.3f Shape %.3f Ver %.3f'%(pose_w,shape_w,ver_w))
     print('Height %.3f Chest %.3f Waist %.3f Neck %.3f Arm %.3f'%(h_w,c_w,w_w,n_w,a_w))
+    print('Camera %.3f'%args.cam_loss)
     
     print('Reprojection %.4f'%args.reprojection_loss_weight)
     print('----------------------------------------------------')
@@ -384,7 +385,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
 
 
             # Iterate over data.
-            for index, imgs,reproj, gt in dataloader[phase]:
+            for index, imgs,reproj, gt, prm_update in dataloader[phase]:
                 
                 batch = gt.shape[0]
                 inputs = torch.FloatTensor([])
@@ -432,11 +433,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
 
                     vertices_prd = torch.reshape(mesh_prd, (batch, -1))
 
-                    
-                    
-                    
-                    
-
+      
                     # ground truth
                     par_gt = gt[:,:82]
                     cam_gt = gt[:,82:82+args.num_views]
@@ -467,26 +464,43 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     if reproj_round!=0:
                         # save_images('/home/yifu/Data/silhouette/update/test','reproj',input_reproj[:,0,:,:])
                         input_reproj_ = torch.chunk(input_reproj,reproj_round,0)
+                    
+                    new_pred = prediction
                     for r in range(0,reproj_round):
                         # save_images('/home/yifu/Data/silhouette/update/test','reproj_%d'%r,input_reproj_[r][:,0,:,:])
                         # reprojections = torch.unsqueeze(input_reproj[:],1)
+                        
+                        par_update = prm_update[r][:,:82]
+                        cam_update = prm_update[r][:,82:82+args.num_views]
+                        rots_update, poses_update, betas_update = decompose_par(par_update)
+                        reprojection_tmp = reprojection(cam_update, rots_update, poses_update, betas_update, args, batch, f_nr,n_renderer)
+                        #save_images('/home/yifu/Data/silhouette/test','reproj_%d'%r,input_reproj_[r][:,0,:,:])
+                        #save_images('/home/yifu/Data/silhouette/test','reproj_prm_%d'%r,reprojection_tmp)
+
+
                         cat_input = torch.cat((inputs,input_reproj_[r]),1)
                         cat_input = torch.detach(cat_input)
                         cam_delta = updater_cam(cat_input)
                         cam_delta= torch.reshape(cam_delta,(args.num_views,batch))
                         cam_delta = torch.t(cam_delta)
-                        new_cam = cam_delta+cam_prd
+                        # new_cam = cam_delta+cam_prd
+                        new_cam = cam_delta+cam_update # check
+
+                        new_pred[:,82:82+args.num_views] = new_cam
                         reprojections = reprojection(new_cam, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer)
                         
-                        cam_delta_loss[r] = criterion (new_cam,cam_gt)
+                        #cam_delta_loss[r] = criterion (new_cam,cam_gt)
+                        cam_delta_loss[r] = max(0, criterion(new_cam-cam_gt,0.6*(cam_update-cam_gt)))
+
                         reproj_delta_loss[r] = criterion (reprojections, inputs[:,0,:,:])
-                        # loss = loss + cam_delta_loss[i]*0.01
-                        loss = loss + reproj_delta_loss[r]*0.001
+                        loss = loss + cam_delta_loss[r]*args.cam_loss
+                        # loss = loss + reproj_delta_loss[r]*0.001
 
                     #update_path = '/home/yifu/Data/silhouette/%s'%phase
                     update_path = join(parent_dic,phase)
                     if epoch%every_epoch == 0:
-                        save_update_images(update_path, reproj_round,inputs[:,0,:,:], reprojections,index,batch,args.num_views)
+                        save_update_images(update_path, reproj_round,inputs[:,0,:,:], reprojections,new_pred,index,batch,args.num_views)
+
                     
                     if reproj_round == 0:
                         continue
