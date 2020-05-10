@@ -673,15 +673,18 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
             
             print ('cam loss %.4f'%epoch_loss_cam)
             for i in range(0,reproj_round):
-                print ('cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta[i]))
+                print ('relu cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta[i]))
+            for i in range(0,reproj_round):
                 print ('abs  cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta_abs[i]))
+            for i in range(0,reproj_round):
                 print ('test cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta_test[i]))
 
             print()
+            '''
             print('rep loss %.4f'%epoch_loss_reproj)
             for i in range(0,reproj_round):
                 print ('rep loss after %d update %.4f'%(i+1,epoch_loss_reproj_delta[i]))
-
+            '''
 
             '''
             for iteration in range(0, args.iteration):
@@ -787,7 +790,8 @@ def main():
     predictor_ = predictor(device, num_output=args.num_output,
                        use_pretrained=True, num_views=args.num_views,)
     # save_path = raw_input('predictor model save path:')
-    save_path = '/home/yifu/Data/silhouette/tmp.pth'
+    # save_path = '/home/yifu/Data/silhouette/tmp.pth'
+    save_path = join(parent_dic,'tmp.pth')
     # save_path = '/scratch/local/ssd/yifu/Data/silhouette/tmp.pth'
     predictor_.load_state_dict(torch.load(save_path))
     updater_cam_ = updater_cam(device, num_output=1, use_pretrained=True, num_views=args.num_views)
