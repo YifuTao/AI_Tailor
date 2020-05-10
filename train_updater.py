@@ -229,6 +229,14 @@ def updater_cam(device, num_output=1, use_pretrained=True, num_views=1):
     model = model.to(device)
     return model
 
+def relu_mse_loss(output,target):
+    # loss_cmp = torch.mean((output - target)**2)
+    relu = nn.ReLU()
+    #tmp = output-target
+    #tmp_ = relu(tmp)
+    loss = torch.mean(relu(output - target)**2)
+    return loss
+
 def three_channel(imgs): # make an image three identical channel 
     imgs = imgs[:,0,:,:]
     imgs=torch.unsqueeze(imgs,1)
@@ -379,7 +387,11 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
             running_loss_cam = 0.0
             running_loss_reproj = 0.0
             running_loss_cam_delta = torch.zeros(reproj_round)
+            running_loss_cam_delta_abs = torch.zeros(reproj_round)
+            running_loss_cam_delta_test = torch.zeros(reproj_round)
             running_loss_reproj_delta = torch.zeros(reproj_round)
+            
+
 
             # running_loss_cam_delta = torch.zeros(args.iteration)
 
@@ -456,6 +468,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         visualise_flag = 0
                     
                     cam_delta_loss = torch.zeros(reproj_round)
+                    cam_delta_loss_abs = torch.zeros(reproj_round)
+                    cam_delta_loss_test = torch.zeros(reproj_round)
                     reproj_delta_loss = torch.zeros(reproj_round)
                     loss = 0
                     
@@ -465,7 +479,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         # save_images('/home/yifu/Data/silhouette/update/test','reproj',input_reproj[:,0,:,:])
                         input_reproj_ = torch.chunk(input_reproj,reproj_round,0)
                     
-                    new_pred = prediction
+                    new_pred = prediction.clone().detach()
                     for r in range(0,reproj_round):
                         # save_images('/home/yifu/Data/silhouette/update/test','reproj_%d'%r,input_reproj_[r][:,0,:,:])
                         # reprojections = torch.unsqueeze(input_reproj[:],1)
@@ -476,10 +490,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         reprojection_tmp = reprojection(cam_update, rots_update, poses_update, betas_update, args, batch, f_nr,n_renderer)
                         #save_images('/home/yifu/Data/silhouette/test','reproj_%d'%r,input_reproj_[r][:,0,:,:])
                         #save_images('/home/yifu/Data/silhouette/test','reproj_prm_%d'%r,reprojection_tmp)
-
-
+                        
                         cat_input = torch.cat((inputs,input_reproj_[r]),1)
-                        cat_input = torch.detach(cat_input)
                         cam_delta = updater_cam(cat_input)
                         cam_delta= torch.reshape(cam_delta,(args.num_views,batch))
                         cam_delta = torch.t(cam_delta)
@@ -489,21 +501,46 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         new_pred[:,82:82+args.num_views] = new_cam
                         reprojections = reprojection(new_cam, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer)
                         
-                        #cam_delta_loss[r] = criterion (new_cam,cam_gt)
-                        cam_delta_loss[r] = max(0, criterion(new_cam-cam_gt,0.6*(cam_update-cam_gt)))
-
+                        cam_delta_loss_abs[r] = criterion (new_cam,cam_gt)
+                        lambda_ = 0.9
+                        # cam_delta_loss[r] = criterion(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt))
+                        cam_delta_loss[r] = relu_mse_loss(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt))
+                        '''
+                        print('   second update')
+                        print(torch.abs(new_cam-cam_gt).data)
+                        print('%.2f*first update'%lambda_)
+                        print(lambda_*torch.abs(cam_update-cam_gt).data)
+                        print(criterion(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt)).data)
+                        print(relu_mse_loss(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt)))
+                        print()
+                        '''
                         reproj_delta_loss[r] = criterion (reprojections, inputs[:,0,:,:])
                         loss = loss + cam_delta_loss[r]*args.cam_loss
                         # loss = loss + reproj_delta_loss[r]*0.001
+                        
 
                     #update_path = '/home/yifu/Data/silhouette/%s'%phase
                     update_path = join(parent_dic,phase)
+                    
                     if epoch%every_epoch == 0:
                         save_update_images(update_path, reproj_round,inputs[:,0,:,:], reprojections,new_pred,index,batch,args.num_views)
-
-                    
+                        
+       
                     if reproj_round == 0:
                         continue
+                    
+                    # Evaluation
+                    reprojections = torch.unsqueeze(reprojection(cam_prd, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer),1)
+                    cam_current = cam_prd.clone().detach() 
+                    for r in range(0,reproj_round):
+                        cat_input = torch.cat((inputs,reprojections.clone().detach()),1)
+                        cam_delta = updater_cam(cat_input)
+                        cam_delta= torch.reshape(cam_delta,(args.num_views,batch))
+                        cam_delta = torch.t(cam_delta)
+                        # new_cam = cam_delta+cam_prd
+                        cam_current = cam_delta+cam_current # check
+                        cam_delta_loss_test[r] = criterion (cam_current,cam_gt)
+                        reprojections = torch.unsqueeze(reprojection(cam_current, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer),1)
                     
                     # Loss ------------------------------------------------
                     pose_loss = criterion(par_prd[:, :72], par_gt[:, :72])
@@ -590,6 +627,9 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                 running_loss_reproj += sil_loss.item() * batch
                 for i in range(0,reproj_round):
                     running_loss_cam_delta[i] += cam_delta_loss[i].item() * batch
+                    running_loss_cam_delta_abs[i] += cam_delta_loss_abs[i].item() * batch
+                    running_loss_cam_delta_test[i] += cam_delta_loss_test[i].item() * batch
+
                     running_loss_reproj_delta[i] += reproj_delta_loss[i].item() * batch
 
                 # running_loss_cam_delta[0] += cam_delta_loss[0].item() * batch
@@ -615,10 +655,14 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
             epoch_loss_reproj = np.sqrt(running_loss_reproj / dataset_size[phase])
 
             epoch_loss_cam_delta = torch.zeros(reproj_round)
+            epoch_loss_cam_delta_abs = torch.zeros(reproj_round)
+            epoch_loss_cam_delta_test = torch.zeros(reproj_round)
             epoch_loss_reproj_delta = torch.zeros(reproj_round)
 
             for i in range(0,reproj_round):
                 epoch_loss_cam_delta[i] = 180/np.pi * np.sqrt(running_loss_cam_delta[i] / dataset_size[phase])
+                epoch_loss_cam_delta_abs[i] = 180/np.pi * np.sqrt(running_loss_cam_delta_abs[i] / dataset_size[phase])
+                epoch_loss_cam_delta_test[i] = 180/np.pi * np.sqrt(running_loss_cam_delta_test[i] / dataset_size[phase])
                 epoch_loss_reproj_delta[i] = np.sqrt(running_loss_reproj_delta[i] / dataset_size[phase])
 
 
@@ -630,7 +674,10 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
             print ('cam loss %.4f'%epoch_loss_cam)
             for i in range(0,reproj_round):
                 print ('cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta[i]))
-            
+                print ('abs  cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta_abs[i]))
+                print ('test cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta_test[i]))
+
+            print()
             print('rep loss %.4f'%epoch_loss_reproj)
             for i in range(0,reproj_round):
                 print ('rep loss after %d update %.4f'%(i+1,epoch_loss_reproj_delta[i]))
