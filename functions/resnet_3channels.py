@@ -229,16 +229,20 @@ class ResNet(nn.Module):
         #print(x.size())        #[12,2048]
         #print(x.size()[0])     #12 = 2 (num_views) x 6(real batch size)
         #print(self.num_views)  #2
-        
-        parts = torch.chunk(x,self.num_views,0)  # parts[k] : torch.Size([batch, 2048])
+        '''
+        parts = torch.chunk(x,2,0)  # parts[k] : torch.Size([batch, 2048])
+        x = torch.cat((parts[0],parts[1]),1)
+        '''
         #print(len(x))  #num_views
         x=torch.unsqueeze(parts[0], 2)
         for k in range(1,self.num_views):
             part = torch.unsqueeze(parts[k], 2)
             x = torch.cat((x,part),2)    # torch.Size([batch, 2048, num_views])
+        
         max_pool = nn.MaxPool1d(self.num_views)
         x = max_pool(x)
         x = x.reshape(x.size(0), -1)
+        
         '''
         x = self.fc(x)  
         # torch.Size([batch, 82])
