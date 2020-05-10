@@ -146,6 +146,12 @@ def parse_args():
         type=bool,
         help=" [n]"
     )
+    parser.add_argument(
+        "--hard",
+        default=False,
+        type=bool,
+        help=" [n]"
+    )
 
     return parser.parse_args()
 
@@ -805,8 +811,14 @@ def main():
     
     if args.ssh==True:
         parent_dic ='/scratch/local/ssd/yifu/Data/silhouette'
+        if args.hard==True:
+            parent_dic ='/scratch/local/ssd/yifu/Data/2views'
     else:
         parent_dic = "/home/yifu/Data/silhouette"
+        if args.hard==True:
+            parent_dic = "/home/yifu/Data/2views"
+
+
     # parent_dic = raw_input('Data Path:')
     
     while os.path.exists(parent_dic)==False:
