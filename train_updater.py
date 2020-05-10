@@ -134,6 +134,12 @@ def parse_args():
         type=int,
         help=" [n]"
     )
+    parser.add_argument(
+        "--improve_ratio",
+        default=0.7,
+        type=float,
+        help=" [n]"
+    )
 
     return parser.parse_args()
 
@@ -502,7 +508,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         reprojections = reprojection(new_cam, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer)
                         
                         cam_delta_loss_abs[r] = criterion (new_cam,cam_gt)
-                        lambda_ = 0.9
+                        lambda_ = args.improve_ratio
                         # cam_delta_loss[r] = criterion(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt))
                         cam_delta_loss[r] = relu_mse_loss(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt))
                         '''

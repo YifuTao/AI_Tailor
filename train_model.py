@@ -179,24 +179,6 @@ def predictor(device, num_output=82, use_pretrained=True, num_views=1):
     # model = nn.DataParallel(model)     # multi GPU
     return model
 
-def updater_cam(device, num_output=1, use_pretrained=True, num_views=1):
-
-    import resnet_6channels
-    model = resnet_6channels.resnet50(
-        pretrained=use_pretrained,
-    )
-    num_ftrs = model.fc.in_features # * num_views
-    model.fc = nn.Linear(num_ftrs, num_output)
-    weight = model.conv1.weight.clone()
-    model.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-    with torch.no_grad():
-        model.conv1.weight[:,:3] = weight
-        model.conv1.weight[:,3:] = weight
-
-
-    model = model.to(device)
-    return model
 
 def three_channel(imgs): # make an image three identical channel 
     imgs = imgs[:,0,:,:]
@@ -249,7 +231,7 @@ def reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer):
     return images
 
 
-def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam, dataloader, criterion, optimiser, scheduler, args,):
+def train_model(parent_dic, save_name, vis_title, device, predictor, dataloader, criterion, optimiser, scheduler, args,):
     import time
     import copy
     
@@ -261,7 +243,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     while len(a) != 8:
         print('weights: pose shape ver h c w n a:')
         # a = [0.1, 0.1, 0.1, 0.0, 0.01, 0.01, 0.01, 0.01]  # standard
-        a = [0, 0, 0, 0, 0, 0, 0, 0]
+        # a = [0, 0, 0, 0, 0, 0, 0, 0]
+        a = [0.1, 0.1, 0, 0, 0, 0, 0, 0]
         # a = [float(x) for x in raw_input().split()]
     pose_w = a[0]
     shape_w= a[1]
@@ -274,7 +257,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     print('Parameter Weights')
     print('Pose %.3f Shape %.3f Ver %.3f'%(pose_w,shape_w,ver_w))
     print('Height %.3f Chest %.3f Waist %.3f Neck %.3f Arm %.3f'%(h_w,c_w,w_w,n_w,a_w))
-    
+    print('Camera %.3f'%args.cam_loss)
     print('Reprojection %.4f'%args.reprojection_loss_weight)
     print('----------------------------------------------------')
     record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'w+')
@@ -322,10 +305,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
             if phase == 'train':
                 #scheduler.step()
                 predictor.train()  # Set model to training mode
-                updater_cam.train()
             else:
                 predictor.eval()   # Set model to evaluate mode
-                updater_cam.eval()
             
             visualise_flag = 1
 
@@ -599,13 +580,12 @@ def main():
     # iteration = int(raw_input('Number of iterations in the neuron network: '))
     predictor_ = predictor(device, num_output=args.num_output,
                        use_pretrained=True, num_views=args.num_views,)
-    updater_cam_ = updater_cam(device, num_output=1, use_pretrained=True, num_views=args.num_views)
     criterion = nn.MSELoss()    # Mean suqared error for each element
     optimiser = optim.SGD(predictor_.parameters(), lr=args.lr, momentum=0.9)
     exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=30, gamma=0.8)
 
     vis_title = save_name
-    model = train_model(parent_dic, save_name, vis_title, device, predictor_, updater_cam_, dataloader, criterion,
+    model = train_model(parent_dic, save_name, vis_title, device, predictor_, dataloader, criterion,
                         optimiser, exp_lr_scheduler, args)
 
 
