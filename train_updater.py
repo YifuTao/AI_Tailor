@@ -674,8 +674,10 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
             print ('cam loss %.4f'%epoch_loss_cam)
             for i in range(0,reproj_round):
                 print ('relu cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta[i]))
+            print()
             for i in range(0,reproj_round):
                 print ('abs  cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta_abs[i]))
+            print()
             for i in range(0,reproj_round):
                 print ('test cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta_test[i]))
 
