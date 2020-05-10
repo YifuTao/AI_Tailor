@@ -58,9 +58,9 @@ def parse_args():
     )
     parser.add_argument(
         "--num_views",
-        default=8,
+        default=2,
         type=int,
-        help="Number of views as input [8]",
+        help="Number of views as input [2]",
     )
     parser.add_argument(
         "--gpu",
@@ -138,6 +138,12 @@ def parse_args():
         "--improve_ratio",
         default=0.7,
         type=float,
+        help=" [n]"
+    )
+    parser.add_argument(
+        "--ssh",
+        default=False,
+        type=bool,
         help=" [n]"
     )
 
@@ -514,7 +520,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         par_update = prm_update[r][:,:82]
                         cam_update = prm_update[r][:,82:82+args.num_views]
                         rots_update, poses_update, betas_update = decompose_par(par_update)
-                        reprojection_tmp = reprojection(cam_update, rots_update, poses_update, betas_update, args, batch, f_nr,n_renderer)
+                        # reprojection_tmp = reprojection(cam_update, rots_update, poses_update, betas_update, args, batch, f_nr,n_renderer)
                         #save_images('/home/yifu/Data/silhouette/test','reproj_%d'%r,input_reproj_[r][:,0,:,:])
                         #save_images('/home/yifu/Data/silhouette/test','reproj_prm_%d'%r,reprojection_tmp)
                         
@@ -796,8 +802,11 @@ def main():
     print('Gender: ', args.gender)
     print('Dataset size: ', args.dataset_size)
     print('Batch size: ', args.batch)
-    parent_dic = "/home/yifu/Data/silhouette"
-    # parent_dic ='/scratch/local/ssd/yifu/Data/silhouette'
+    
+    if args.ssh==True:
+        parent_dic ='/scratch/local/ssd/yifu/Data/silhouette'
+    else:
+        parent_dic = "/home/yifu/Data/silhouette"
     # parent_dic = raw_input('Data Path:')
     
     while os.path.exists(parent_dic)==False:
@@ -840,7 +849,7 @@ def main():
     updater_cam_ = updater_cam_sharedW(device, num_output=1, use_pretrained=True, num_views=args.num_views)
     criterion = nn.MSELoss()    # Mean suqared error for each element
     optimiser = optim.SGD(updater_cam_.parameters(), lr=args.lr, momentum=0.9)
-    exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=10, gamma=0.1)
+    exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=10, gamma=0.3)
 
     vis_title = save_name
     model = train_model(parent_dic, save_name, vis_title, device, predictor_, updater_cam_, parent_dic, criterion,
