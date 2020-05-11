@@ -40,7 +40,7 @@ class HumanTestSet(data.Dataset):
 
 
 class UpdateSet(data.Dataset):
-    def __init__(self, root,data_size,reproj_round, transform=None, num_views=1,normalise_scale=1):
+    def __init__(self, root,data_size, transform=None, num_views=1,normalise_scale=1):
         #super(HumanTestSet, self).__init__()
         #super(HumanTestSet, self).__init__(root, data_size, transform)
         self.root = root
@@ -48,7 +48,6 @@ class UpdateSet(data.Dataset):
         self.data_size = data_size    # train/val
         self.normalise_scale = normalise_scale
         self.num_views = num_views
-        self.reproj_round = reproj_round
 
     def __len__(self):
         return self.data_size 
@@ -71,16 +70,16 @@ class UpdateSet(data.Dataset):
             img = Image.open(img_name)
             imgs.append(self.transform(img))
         
-        for j in range(0,self.reproj_round):
-            pickle_path = os.path.join(self.root, '%d_reproj_%d'%(index,j))
-            infile = open(pickle_path, 'rb')
-            param_upd = pickle.load(infile)
-            infile.close()
-            par_update.append(param_upd)
-            for i in range(0,self.num_views):
-                img_name = os.path.join(self.root, '%d_%d_reproj_%d.png' % (index,i,j))    #image
-                img = Image.open(img_name)
-                reproj.append(self.transform(img))
+        
+        pickle_path = os.path.join(self.root, '%d_reproj'%(index))
+        infile = open(pickle_path, 'rb')
+        param_upd = pickle.load(infile)
+        infile.close()
+        par_update.append(param_upd)
+        for i in range(0,self.num_views):
+            img_name = os.path.join(self.root, '%d_%d_reproj.png' % (index,i))    #image
+            img = Image.open(img_name)
+            reproj.append(self.transform(img))
 
         
 

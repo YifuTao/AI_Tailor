@@ -11,7 +11,8 @@
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            "args":["--dataset_size","4","--batch","2","--num_views","1","--gpu","0","--update_period","5"],
+            "args":["--dataset_size","7","--batch","1","--num_views","2","--gpu","0","--update_period","2", "--gtPose","T"],
+            //"args":["--dataset_size","20","--batch","1","--num_views","2","--gpu","0", "--gtPose","T"],
             "program": "${file}",
             "console": "integratedTerminal"
         }
