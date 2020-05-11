@@ -34,13 +34,16 @@ def save_update_images(index, path, count,inputs, reprojection,gt,new_prd, batch
     for b in range(0,batch):    
 
         pickle_path = join(path,'%d'%(count))
-        pickle.dump(gt[b], open(pickle_path, 'wb'))
+        pickle.dump(gt[b].detach().cpu(), open(pickle_path, 'wb'))
         infile = open(pickle_path, 'rb')
         tmp1 = pickle.load(infile)
         infile.close()
 
         pickle_path = join(path,'%d_reproj'%(count))
-        pickle.dump(new_prd[b], open(pickle_path, 'wb'))
+        prediction = torch.zeros(gt[b].shape[0])
+        #    = new_prd[b].detach().cpu()
+        prediction[:new_prd[b].shape[0]] = new_prd[b]
+        pickle.dump(prediction.detach().cpu(), open(pickle_path, 'wb'))
         infile = open(pickle_path, 'rb')
         tmp2 = pickle.load(infile)
         infile.close()

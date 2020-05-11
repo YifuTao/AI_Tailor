@@ -60,6 +60,8 @@ class UpdateSet(data.Dataset):
         #par = pickle.load(infile, encoding='latin1') #pickle in py2 but using py3 now
         infile.close()
 
+        #if index >=18:
+        #    print('>18')
         # image
         imgs=[]
         reproj = []
