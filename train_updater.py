@@ -11,8 +11,6 @@ import numpy as np
 import pickle
 import shutil
 import glob
-import GPUtil
-import inspect
 
 import sys
 sys.path.append('functions')
@@ -187,7 +185,7 @@ def load_data(total_dataset_size, parent_dic, args):
 
     return dataloader
 
-def load_data_updater(dataset_size, parent_dic, args):
+def load_data_updater(total_dataset_size, parent_dic, args):
     import torchvision.transforms as transforms
     from torchvision.transforms import ToTensor, Compose, CenterCrop
     import os
@@ -198,7 +196,7 @@ def load_data_updater(dataset_size, parent_dic, args):
     # img_transform = Compose([CenterCrop(400),ToTensor(),])  # for unscaled
     img_transform = ToTensor()  # for scaled
 
-    # dataset_size = split_dataset(total_dataset_size)    # TODO
+    dataset_size = split_dataset(total_dataset_size)    # TODO
     directory = {x: os.path.join(parent_dic, x) for x in ['train', 'val']}
     silhouette = {x: UpdateSet(
         directory[x], dataset_size[x], img_transform, num_views=args.num_views) for x in ['train', 'val']}
@@ -331,7 +329,6 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     import time
     import copy
     
-
     bce_loss = nn.BCELoss()
     l2_loss = nn.MSELoss()
     since = time.time()
@@ -405,7 +402,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     
 
     dataset_size = split_dataset(args.dataset_size)
-    
+    dataset_size_total = dataset_size['train']+dataset_size['val']
     for epoch in range(num_epochs):
         count = 0
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -423,7 +420,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
             reproj_round = int((epoch-1)/every_epoch)+1
         
         
-        dataloader = load_data_updater(dataset_size, reproj_train_path, args)
+        dataloader = load_data_updater(dataset_size_total, reproj_train_path, args)
 
         # Each epoch has a training and validation phase
         predictor.eval()
@@ -459,8 +456,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
 
             # Iterate over data.
             for index, imgs,reproj, gt, prm_update in dataloader[phase]:
-
-                # GPUtil.showUtilization()
+                
                 batch = gt.shape[0]
                 inputs = torch.FloatTensor([])
                 input_reproj = torch.FloatTensor([])
@@ -557,8 +553,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     new_cam = cam_delta+cam_update
 
                     new_pred[:,82:82+args.num_views] = new_cam
-                    with torch.no_grad():
-                        reprojections = reprojection(new_cam, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer)
+                    reprojections = reprojection(new_cam, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer)
                     # save update
                     update_path = join(reproj_train_path,phase)
                     if epoch%every_epoch == 0:
@@ -586,19 +581,18 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     
                     
                     # Evaluation
-                    with torch.no_grad():
-                        reprojections = torch.unsqueeze(reprojection(cam_prd, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer),1)
-                        cam_current = cam_prd.clone().detach()
-                        cam_delta_loss_test = torch.zeros(reproj_round).to(device)
-                        for r in range(0,reproj_round):
-                            cat_input = torch.cat((inputs,reprojections.clone().detach()),0)
-                            cam_delta = updater_cam(cat_input)
-                            cam_delta= torch.reshape(cam_delta,(args.num_views,batch))
-                            cam_delta = torch.t(cam_delta)
-                            # new_cam = cam_delta+cam_prd
-                            cam_current = cam_delta+cam_current # check
-                            cam_delta_loss_test[r] = criterion (cam_current,cam_gt)
-                            reprojections = torch.unsqueeze(reprojection(cam_current, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer),1)
+                    reprojections = torch.unsqueeze(reprojection(cam_prd, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer),1)
+                    cam_current = cam_prd.clone().detach()
+                    cam_delta_loss_test = torch.zeros(reproj_round).to(device)
+                    for r in range(0,reproj_round):
+                        cat_input = torch.cat((inputs,reprojections.clone().detach()),0)
+                        cam_delta = updater_cam(cat_input)
+                        cam_delta= torch.reshape(cam_delta,(args.num_views,batch))
+                        cam_delta = torch.t(cam_delta)
+                        # new_cam = cam_delta+cam_prd
+                        cam_current = cam_delta+cam_current # check
+                        cam_delta_loss_test[r] = criterion (cam_current,cam_gt)
+                        reprojections = torch.unsqueeze(reprojection(cam_current, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer),1)
                     
                     
                     
@@ -653,11 +647,10 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                 running_loss_reproj_delta += reproj_delta_loss.item() * batch
 
 
-            if epoch%every_epoch == 0 and phase=='val':
+            if epoch%every_epoch == 0:
                 print(dataset_size)
-
-            # if epoch == 0:
-            #     continue
+            if epoch == 0:
+                continue
             if phase == 'train' :
                 scheduler.step()
 
