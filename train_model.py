@@ -168,7 +168,7 @@ def predictor(device, num_output=82, use_pretrained=True, num_views=1):
     # print(model.fc.out_features)   #1000 resnet deafult: number of output classes
     # change output number of classes
     
-    model.fc = nn.Linear(num_ftrs, num_output)
+    model.fc = nn.Linear(num_ftrs+1, num_output)
 
     weight = model.conv1.weight.clone()
     model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
@@ -354,7 +354,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, dataloader,
                 with torch.set_grad_enabled(phase == 'train'):
                     # torch.autograd.set_detect_anomaly(True)
                     # prediction
-                    prediction = predictor(inputs)
+                    cam_gt = gt[:,82:82+args.num_views]
+                    prediction = predictor(inputs,cam_gt)
                     
                     par_prd = prediction[:,:82]
                     # use gt pose and camera
@@ -555,8 +556,8 @@ def main():
         parent_dic = raw_input('Data Path:')  
     if os.path.exists(join(parent_dic,'trained_model'))==False:
         os.mkdir(join(parent_dic,'trained_model'))
-    # save_name = 'test'
-    save_name = raw_input('Name of the model weights saved:')
+    save_name = 'tmp'
+    # save_name = raw_input('Name of the model weights saved:')
     weights_path = join(parent_dic,'trained_model','%s_weights'%save_name, save_name+'.pth')
     
     while os.path.exists(weights_path) and save_name!='tmp':
@@ -568,9 +569,11 @@ def main():
     print('Network weights save path: ', weights_path)
 
     print('-----------------------------------------------------------')
+    '''
     if raw_input('Confirm the above setting? (y/n): ')!='y':
         print('Terminated')
         exit()
+    '''
     print('Training starts')
     print('-----------------------------------------------------------')
     

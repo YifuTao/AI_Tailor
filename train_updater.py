@@ -384,6 +384,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
         shutil.rmtree(weights_path)
     os.mkdir(weights_path)
     reproj_train_path = join(parent_dic,'reprojection_%d'%args.gpu)
+    print(reproj_train_path)
     if os.path.exists(reproj_train_path):
         shutil.rmtree(reproj_train_path)
     os.mkdir(reproj_train_path)
@@ -554,7 +555,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         dataset_size[phase] = save_update_images(index,update_path, dataset_size[phase],inputs[:,0,:,:], reprojections,gt, new_pred,batch,args.num_views)
                     
                     cat_input = torch.cat((inputs,input_reproj),0)
-                    cam_delta = updater_cam(cat_input)
+                    cam_delta = updater_cam(cat_input,0)
                     cam_delta= torch.reshape(cam_delta,(args.num_views,batch))
                     cam_delta = torch.t(cam_delta)
                     new_cam = cam_delta+cam_update
