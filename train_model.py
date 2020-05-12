@@ -10,6 +10,7 @@ import visdom
 import numpy as np
 import pickle
 import shutil
+from math import ceil
 
 import sys
 sys.path.append('functions')
@@ -560,6 +561,9 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, dataloader,
 
 def main():
     args = parse_args()
+
+ 
+
 
     device = torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(device)

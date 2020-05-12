@@ -6,6 +6,8 @@ change #2 : chagne forward function in ResNet
 '''
 import torch
 import torch.nn as nn
+import numpy as np
+from math import ceil
 #from .utils import load_state_dict_from_url
 
 
@@ -22,6 +24,18 @@ model_urls = {
     'resnext50_32x4d': 'https://download.pytorch.org/models/resnext50_32x4d-7cdf4587.pth',
     'resnext101_32x8d': 'https://download.pytorch.org/models/resnext101_32x8d-8ba56ff5.pth',
 }
+def oneHotEncoding(angle):
+    lim_low = -np.pi/8
+    lim_high = np.pi*15/8
+    lim_range = np.pi*2
+    interval = 360
+    batch = angle.shape[0]
+    vector = torch.zeros(batch,interval+1).cuda()
+    num = ((angle-lim_low) / lim_range * interval)
+    for i in range(batch):
+        vector[i,int(num[i])]= num[i]-int(num[i])
+        vector[i,int(ceil(num[i]))] = int(num[i])+1 - num[i]
+    return vector
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -153,8 +167,8 @@ class ResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        self.cam1 = nn.Linear(1,128)    # could use nn.Sequential to add MPL and ReLU
-        self.cam2 = nn.Linear(2048+128,2048)    # could use nn.Sequential to add MPL and ReLU
+        self.cam1 = nn.Linear(361,512)    # could use nn.Sequential to add MPL and ReLU
+        self.cam2 = nn.Linear(2048+512,2048)    # could use nn.Sequential to add MPL and ReLU
 
         
         self.num_views = num_views  # added
@@ -233,9 +247,11 @@ class ResNet(nn.Module):
         
         parts = torch.chunk(x,self.num_views,0)  # parts[k] : torch.Size([batch, 2048])
         cam = torch.t(cam)
+
         x = torch.FloatTensor([]).cuda()
         for k in range(0,self.num_views):
-            cam_view = cam[k,:].unsqueeze(1)
+            cam_view = cam[k,:]# .unsqueeze(1)
+            cam_view = oneHotEncoding(cam_view)
             cam_view = self.cam1(cam_view)
             cam_view = self.relu(cam_view)
             ftr = torch.cat((parts[k],cam_view),1)
