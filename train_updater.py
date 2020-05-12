@@ -200,7 +200,7 @@ def load_data_updater(dataset_size, parent_dic, args):
     directory = {x: os.path.join(parent_dic, x) for x in ['train', 'val']}
     silhouette = {x: UpdateSet(
         directory[x], dataset_size[x], img_transform, num_views=args.num_views) for x in ['train', 'val']}
-    dataloader = {x: DataLoader(silhouette[x], shuffle=True, batch_size=args.batch)
+    dataloader = {x: DataLoader(silhouette[x], shuffle=False, batch_size=args.batch)
                   for x in ['train', 'val']}
 
     return dataloader
@@ -547,39 +547,40 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     # reprojection_tmp = reprojection(cam_update, rots_update, poses_update, betas_update, args, batch, f_nr,n_renderer)
                     #save_images('/home/yifu/Data/silhouette/test','reproj_%d'%r,input_reproj_[r][:,0,:,:])
                     #save_images('/home/yifu/Data/silhouette/test','reproj_prm_%d'%r,reprojection_tmp)
+
+                    update_path = join(reproj_train_path,phase)
+                    if epoch==0:
+                        dataset_size[phase] = save_update_images(index,update_path, dataset_size[phase],inputs[:,0,:,:], reprojections,gt, new_pred,batch,args.num_views)
                     
                     cat_input = torch.cat((inputs,input_reproj),0)
                     cam_delta = updater_cam(cat_input)
                     cam_delta= torch.reshape(cam_delta,(args.num_views,batch))
                     cam_delta = torch.t(cam_delta)
                     new_cam = cam_delta+cam_update
-
                     new_pred[:,82:82+args.num_views] = new_cam
+
                     with torch.no_grad():
                         reprojections = reprojection(new_cam, rots_prd, poses_prd, betas_prd, args, batch, f_nr,n_renderer)
-                    # save update
-                    update_path = join(reproj_train_path,phase)
-                    if epoch%every_epoch == 0:
-                        dataset_size[phase] = save_update_images(index,update_path, dataset_size[phase],inputs[:,0,:,:], reprojections,gt, new_pred,batch,args.num_views)
-                    
+                
                     cam_delta_loss_abs = criterion (new_cam,cam_gt)
                     lambda_ = args.improve_ratio
                     # cam_delta_loss[r] = criterion(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt))
                     cam_delta_loss = relu_mse_loss(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt))
-                    '''
-                    print('   second update')
-                    print(torch.abs(new_cam-cam_gt).data)
-                    print('%.2f*first update'%lambda_)
-                    print(lambda_*torch.abs(cam_update-cam_gt).data)
-                    print(criterion(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt)).data)
-                    print(relu_mse_loss(torch.abs(new_cam-cam_gt), lambda_*torch.abs(cam_update-cam_gt)))
-                    print()
-                    '''
+                    
                     reproj_delta_loss = criterion (reprojections, inputs[:,0,:,:])
+                    dataset_size_init = split_dataset(args.dataset_size)
+                    '''
+                    if index[batch-1]<dataset_size_init[phase]:
+                        cam_delta_loss = 0 * cam_delta_loss
+                        cam_delta_loss_abs = 0 * cam_delta_loss_abs
+                    '''
                     loss = loss + cam_delta_loss*args.cam_loss
                     # loss = loss + reproj_delta_loss[r]*0.001
 
-                     
+                    # save update
+                    if epoch%every_epoch == 0 and epoch>0:
+                        dataset_size[phase] = save_update_images(index,update_path, dataset_size[phase],inputs[:,0,:,:], reprojections,gt, new_pred,batch,args.num_views)
+                    
        
                     
                     
@@ -653,8 +654,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
 
             if epoch%every_epoch == 0 and phase=='val':
                 print(dataset_size)
-            if epoch == 0:
-                continue
+            #if epoch == 0:
+            #    continue
             if phase == 'train' :
                 scheduler.step()
 
@@ -710,11 +711,11 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
 
 
 
-            print('{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Height{:.2f}cm Camera {:.2f}degree Reprojction {:.2f}'.format(
+            print('{} Loss: {:.7f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Height{:.2f}cm Camera {:.2f}degree Reprojction {:.2f}'.format(
                 phase, epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w,epoch_loss_h, epoch_loss_cam,epoch_loss_reproj))
             record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'a')
             record.writelines(
-                '{} Loss: {:.4f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm {:.2f}cm Height {:.2f}cm Camera {:.2f}degree Reprojction {:.2f}\n'.format(
+                '{} Loss: {:.7f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm {:.2f}cm Height {:.2f}cm Camera {:.2f}degree Reprojction {:.2f}\n'.format(
                 phase, epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w, epoch_loss_n, epoch_loss_a,epoch_loss_h,epoch_loss_cam, epoch_loss_reproj)
             )
             time_elapsed = time.time() - checkpoint
