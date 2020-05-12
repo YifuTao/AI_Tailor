@@ -134,7 +134,12 @@ def parse_args():
         type=bool,
         help=" [n]"
     )
-
+    parser.add_argument(
+        "--zero_cam",
+        default=False,
+        type=bool,
+        help=" [n]"
+    )
     return parser.parse_args()
 
 
@@ -366,9 +371,13 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, dataloader,
                 with torch.set_grad_enabled(phase == 'train'):
                     # torch.autograd.set_detect_anomaly(True)
                     # prediction
-                    cam_gt = gt[:,82:82+args.num_views]
-                    prediction = predictor(inputs,cam_gt)
-                    
+                    cam_gt_tmp = gt[:,82:82+args.num_views].clone().detach()
+
+                    if args.zero_cam == True:
+                        cam_gt_tmp = torch.zeros(batch,args.num_views).to(device)
+
+                    prediction = predictor(inputs,cam_gt_tmp)
+
                     par_prd = prediction[:,:82]
                     # use gt pose and camera
                     if args.gtPose == True:
