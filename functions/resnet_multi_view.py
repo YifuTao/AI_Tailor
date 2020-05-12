@@ -153,8 +153,8 @@ class ResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        self.cam1 = nn.Linear(2048+1,2048+1)    # could use nn.Sequential to add MPL and ReLU
-        self.cam2 = nn.Linear(2048+1,2048+1)    # could use nn.Sequential to add MPL and ReLU
+        self.cam1 = nn.Linear(1,128)    # could use nn.Sequential to add MPL and ReLU
+        self.cam2 = nn.Linear(2048+128,2048)    # could use nn.Sequential to add MPL and ReLU
 
         
         self.num_views = num_views  # added
@@ -233,15 +233,16 @@ class ResNet(nn.Module):
         
         parts = torch.chunk(x,self.num_views,0)  # parts[k] : torch.Size([batch, 2048])
         cam = torch.t(cam)
-        x_all = torch.FloatTensor([]).cuda()
+        x = torch.FloatTensor([]).cuda()
         for k in range(0,self.num_views):
-            x = torch.cat((parts[k],cam[k,:].unsqueeze(1)),1)
-            x = self.cam1(x)
-            x = self.relu(x)
-            x = self.cam2(x)
-            x = self.relu(x)
-            x = torch.unsqueeze(x, 2)
-            x_all = torch.cat((x_all,x),2)
+            cam_view = cam[k,:].unsqueeze(1)
+            cam_view = self.cam1(cam_view)
+            cam_view = self.relu(cam_view)
+            ftr = torch.cat((parts[k],cam_view),1)
+            ftr = self.cam2(ftr)
+            ftr = self.relu(ftr)
+            ftr = torch.unsqueeze(ftr, 2)
+            x = torch.cat((x,ftr),2)
         '''
         #print(len(x))  #num_views
         x=torch.unsqueeze(parts[0], 2)
@@ -250,7 +251,7 @@ class ResNet(nn.Module):
             x = torch.cat((x,part),2)    # torch.Size([batch, 2048, num_views])
         '''
         max_pool = nn.MaxPool1d(self.num_views)
-        x = max_pool(x_all)
+        x = max_pool(x)
         x = x.reshape(x.size(0), -1)
         x = self.fc(x)  
         # torch.Size([batch, 82])

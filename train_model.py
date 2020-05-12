@@ -185,7 +185,7 @@ def predictor(device, num_output=82, use_pretrained=True, num_views=1):
     # print(model.fc.out_features)   #1000 resnet deafult: number of output classes
     # change output number of classes
     
-    model.fc = nn.Linear(num_ftrs+1, num_output)
+    model.fc = nn.Linear(num_ftrs, num_output)
 
     weight = model.conv1.weight.clone()
     model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
