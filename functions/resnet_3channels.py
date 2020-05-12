@@ -154,7 +154,9 @@ class ResNet(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
         self.cam = nn.Linear(2048,1)    # could use nn.Sequential to add MPL and ReLU
-        
+        self.fc1 = nn.Linear(512 * block.expansion*2, 512 * block.expansion*2)
+        self.fc2 = nn.Linear(512 * block.expansion*2, 512 * block.expansion*2)
+
         self.num_views = num_views  # added
 
         for m in self.modules():
@@ -232,6 +234,10 @@ class ResNet(nn.Module):
         '''
         parts = torch.chunk(x,2,0)  # parts[k] : torch.Size([batch, 2048])
         x = torch.cat((parts[0],parts[1]),1)
+        x = self.fc1(x)
+        x = self.relu(x)
+        #x = self.fc2(x)
+        #x = self.relu(x)
         '''
         #print(len(x))  #num_views
         x=torch.unsqueeze(parts[0], 2)

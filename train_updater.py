@@ -383,9 +383,10 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     if os.path.exists(weights_path):
         shutil.rmtree(weights_path)
     os.mkdir(weights_path)
-    reproj_train_path = join(parent_dic,'reprojection')
+    reproj_train_path = join(parent_dic,'reprojection_%d'%args.gpu)
     if os.path.exists(reproj_train_path):
         shutil.rmtree(reproj_train_path)
+    os.mkdir(reproj_train_path)
     shutil.copytree(join(parent_dic,'train'),join(reproj_train_path,'train'))
     shutil.copytree(join(parent_dic,'val'),join(reproj_train_path,'val'))
     
