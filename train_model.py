@@ -148,8 +148,11 @@ def parse_args():
 
 def split_dataset(total_dataset_size):
     dataset_size = {
-        'train': int(total_dataset_size*0.95),
-        'val': int(total_dataset_size*0.05),
+        # 'train': int(total_dataset_size*0.95),
+        'train': total_dataset_size,
+        #'val': int(total_dataset_size*0.05),
+        'val': 200,
+
     }
     return dataset_size
 
@@ -642,7 +645,7 @@ def main():
                        use_pretrained=True, num_views=args.num_views,)
     criterion = nn.MSELoss()    # Mean suqared error for each element
     optimiser = optim.SGD(predictor_.parameters(), lr=args.lr, momentum=0.9)
-    exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=30, gamma=0.8)
+    exp_lr_scheduler = lr_scheduler.StepLR(optimiser, step_size=10, gamma=0.7)
 
     vis_title = save_name
     model = train_model(parent_dic, save_name, vis_title, device, predictor_, dataloader, criterion,

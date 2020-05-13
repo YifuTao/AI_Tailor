@@ -139,7 +139,7 @@ def main():
     m = pickle.load(open('models/basicModel_%s_lbs_10_207_0_v1.0.0.pkl' % gender[0]))
     dataset_size = args.dataset_size
     print('Dataset range:', args.start_num, ' - ', dataset_size+args.start_num-1)
-    parent_dic = '/home/yifu/Data/2views/val'
+    parent_dic = '/home/yifu/Data/test'
     print('Data Path: ',parent_dic)
     device = torch.device("cuda:%d"%args.gpu if torch.cuda.is_available() else "cpu")
     torch.cuda.set_device(device)
@@ -176,6 +176,7 @@ def main():
             name = '%d_%d'%(i, view)
 
             noise = angle * (np.random.rand()-0.5)
+            # noise = 0
             mesh_rot = angle * view + noise 
             v = transpose_mesh(vertices, mesh_rot, axis)    # temp vertices
             camera[view] = mesh_rot
@@ -243,7 +244,7 @@ def main():
         outmesh_path = join(path, '%d.obj'%i)
 
         with open(outmesh_path, 'w') as fp:
-            for v in vertices[0]:
+            for v in vertices:
                 #fp.write( 'v %f %f %f\n' % ( float(v[0]),float(v[1]), float(v[2])) )
                 fp.write( 'v %f %f %f\n' % (v[0], v[1],v[2]))
             for f in m['f']+1: # Faces are 1-based, not 0-based in obj files
