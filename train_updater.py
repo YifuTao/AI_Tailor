@@ -11,6 +11,7 @@ import numpy as np
 import pickle
 import shutil
 import glob
+import csv
 
 import sys
 sys.path.append('functions')
@@ -354,6 +355,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     
     print('Reprojection %.4f'%args.reprojection_loss_weight)
     print('----------------------------------------------------')
+
     record = open(join(parent_dic, 'trained_model',save_name+'_record.txt'),'w+')
     record.write('Gender:%s\n'%args.gender)
     record.write('Dataset:%d\n'%args.dataset_size)
@@ -399,7 +401,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                 des = f[:-4]+'_reproj.png'
             shutil.copy(f,des)
     
-
+    
 
     
 

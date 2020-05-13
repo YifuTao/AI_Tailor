@@ -9,6 +9,8 @@ from os.path import join
 import visdom
 import numpy as np
 import pickle
+import csv
+import numpy as np
 import shutil
 from math import ceil
 
@@ -289,6 +291,15 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, dataloader,
 
     if args.visdom == True:
         vis, win_shape, win_pose_ver, win_cw, win_na = visdom_init(a)
+    
+    csv_name = join(parent_dic, 'trained_model',save_name+'.csv')
+    csv_file = open(csv_name, mode='w')
+    csv_writer = csv.writer(csv_file, delimiter=',',lineterminator='\n')
+    csv_writer.writerow([' ','loss','loss']+[' ','shape','shape'])
+    csv_writer.writerow([' ','train','val']*2)
+
+
+
 
     num_epochs = args.epochs
     best_model_wts = copy.deepcopy(predictor.state_dict())
@@ -307,6 +318,10 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, dataloader,
     if os.path.exists(weights_path):
         shutil.rmtree(weights_path)
     os.mkdir(weights_path)
+    csv_save ={
+        'train': np.zeros(10),
+        'val': np.zeros(10),
+    }
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -534,6 +549,11 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, dataloader,
             if args.visdom == True:
                 vis=visdom_append(vis, epoch,epoch_loss_shape,epoch_loss_pose,epoch_loss_ver,epoch_loss_c,epoch_loss_w,epoch_loss_n,epoch_loss_a,phase,
                                     win_shape,win_pose_ver,win_cw,win_na)
+
+            csv_save[phase][0] = epoch_loss 
+            csv_save[phase][1] = epoch_loss_shape 
+            
+            
             
             # deep copy the model
             if phase == 'val' and epoch_loss < best_loss:
@@ -544,6 +564,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, dataloader,
                 torch.save(best_model_wts, join(weights_path, save_name+'_epoch_%d.pth'%epoch))
 
         print()
+        csv_writer.writerow([epoch,csv_save['train'][0],csv_save['val'][0],' ',csv_save['train'][1],csv_save['val'][1]])
+        # csv_writer.writerow(['\n'])
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -553,7 +575,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, dataloader,
     record.writelines('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
     record.close()
-
+    csv_file.close()
     # load best model weights
     predictor.load_state_dict(best_model_wts, strict=False)
     return predictor
