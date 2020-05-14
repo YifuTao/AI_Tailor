@@ -20,7 +20,7 @@ from body_measurements import vertex2measurements
 
 from smpl_webuser.serialization import load_model
 import neural_renderer as nr
-from data_generator import scale_vert_nr_batch_forLoop
+# from data_generator import scale_vert_nr_batch_forLoop
 from nr_function import save_images,save_update_images
 from SMPL_Pytorch import generate_obj
 
@@ -325,6 +325,18 @@ def reprojection(cam_prd, rots, poses, betas, args, batch, f_nr,n_renderer):
     images = n_renderer(mesh_cat, face, mode='silhouettes') # silhouettes
     return images
 
+def scale_vert_nr_batch_forLoop(v): # v.shape=[batch, 6890, 3]
+    for i in range(v.shape[0]):
+        v[i,:,:] = scale_vert_nr(v[i,:,:])
+    return v
+        
+def scale_vert_nr(v):   # v.shape=[6890, 3]
+    v = v - v.min(0)[0][None, :]
+    # if torch.abs(v).max()>1:
+    v = v / torch.abs(v).max()
+    v = v * 2
+    v = v - v.max(0)[0][None,:]/2
+    return v
 
 def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam, criterion, optimiser, scheduler, args,):
     import time
