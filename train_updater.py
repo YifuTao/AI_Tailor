@@ -11,6 +11,8 @@ import numpy as np
 import pickle
 import shutil
 import glob
+import csv
+import numpy as np
 
 import sys
 sys.path.append('functions')
@@ -28,7 +30,7 @@ def parse_args():
     import argparse
     parser = argparse.ArgumentParser(description="train a model")
     parser.add_argument(
-        "--num_epochs",
+        "--epochs",
         default=25,
         type=int,
         help="Total number of epochs for training [25]",
@@ -366,7 +368,17 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     if args.visdom == True:
         vis, win_shape, win_pose_ver, win_cw, win_na = visdom_init(a)
 
-    num_epochs = args.num_epochs
+    csv_name = join(parent_dic, 'trained_model',save_name+'.csv')
+    csv_file = open(csv_name, mode='w')
+    csv_writer = csv.writer(csv_file, delimiter=',',lineterminator='\n')
+    # csv_writer.writerow([' ','loss','loss']+[' ','shape','shape'])
+    # csv_writer.writerow([' ','train','val']*2)
+    csv_save ={
+        'train': np.zeros(20),
+        'val': np.zeros(20),
+    }
+
+    num_epochs = args.epochs
     best_model_wts = copy.deepcopy(predictor.state_dict())
     best_loss = float("inf")
     n_renderer = nr.Renderer(image_size=300, perspective=False, camera_mode='look_at')
@@ -719,6 +731,9 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                 '{} Loss: {:.7f} RMS Shape {:.4f} Pose {:.4F} Ver {:.4f} Chest {:.2f}cm Waist {:.2f}cm Neck {:.2f}cm Arm {:.2f}cm Height {:.2f}cm Camera {:.2f}degree Reprojction {:.2f}\n'.format(
                 phase, epoch_loss, epoch_loss_shape, epoch_loss_pose, epoch_loss_ver, epoch_loss_c, epoch_loss_w, epoch_loss_n, epoch_loss_a,epoch_loss_h,epoch_loss_cam, epoch_loss_reproj)
             )
+            for i in range(0,reproj_round):
+                record.writelines('test cam loss after %d update %.4f'%(i+1,epoch_loss_cam_delta_test[i]))
+
             time_elapsed = time.time() - checkpoint
             checkpoint = time.time()
             print('Computation Time:{:.0f}m {:.0f}s\n'.format(time_elapsed // 60, time_elapsed % 60))
@@ -728,6 +743,9 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
             if args.visdom == True:
                 vis=visdom_append(vis, epoch,epoch_loss_shape,epoch_loss_pose,epoch_loss_ver,epoch_loss_c,epoch_loss_w,epoch_loss_n,epoch_loss_a,phase,
                                     win_shape,win_pose_ver,win_cw,win_na)
+
+            for i in range(0,reproj_round):
+                csv_save[phase][i] = epoch_loss_cam_delta_test[i] 
             
             # deep copy the model
             if phase == 'val' and epoch_loss < best_loss:
@@ -738,6 +756,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                 torch.save(best_model_wts, join(weights_path, save_name+'_epoch_%d.pth'%epoch))
 
         print()
+        csv_writer.writerow([epoch,csv_save['train'][:reproj_round],' ',csv_save['val'][:reproj_round]])
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -747,6 +766,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
     record.writelines('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
     record.close()
+    csv_file.close()
 
     # load best model weights
     predictor.load_state_dict(best_model_wts, strict=False)
@@ -810,9 +830,9 @@ def main():
     # iteration = int(raw_input('Number of iterations in the neuron network: '))
     predictor_ = predictor(device, num_output=args.num_output,
                        use_pretrained=True, num_views=args.num_views,)
-    # save_path = raw_input('predictor model save path:')
+    save_path = raw_input('predictor model save path:')
     # save_path = '/home/yifu/Data/silhouette/tmp.pth'
-    save_path = join(parent_dic,'tmp.pth')
+    # save_path = join(parent_dic,'tmp.pth')
     # save_path = '/scratch/local/ssd/yifu/Data/silhouette/tmp.pth'
     predictor_.load_state_dict(torch.load(save_path))
     updater_cam_ = updater_cam_sharedW(device, num_output=1, use_pretrained=True, num_views=args.num_views)

@@ -122,6 +122,18 @@ def parse_args():
         type=bool,
         help="use ground truth human pose [n]"
     )
+    parser.add_argument(
+        "--ssh",
+        default=False,
+        type=bool,
+        help=" [n]"
+    )
+    parser.add_argument(
+        "--hard",
+        default=False,
+        type=bool,
+        help=" [n]"
+    )
 
     return parser.parse_args()
 
@@ -548,7 +560,16 @@ def main():
     print('Gender: ', args.gender)
     print('Dataset size: ', args.dataset_size)
     print('Batch size: ', args.batch)
-    parent_dic = "/home/yifu/Data/silhouette"
+    # parent_dic = "/home/yifu/Data/silhouette"
+    # parent_dic = "/home/yifu/Data/2views"
+    if args.ssh==True:
+        parent_dic ='/scratch/local/ssd/yifu/Data/silhouette'
+        if args.hard==True:
+            parent_dic ='/scratch/local/ssd/yifu/Data/2views'
+    else:
+        parent_dic = "/home/yifu/Data/silhouette"
+        if args.hard==True:
+            parent_dic = "/home/yifu/Data/2views"
     # parent_dic = raw_input('Data Path:')
     while os.path.exists(parent_dic)==False:
         print('Wrong data path!')
