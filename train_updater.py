@@ -605,6 +605,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                     
                     cat_input = torch.cat((inputs,input_reproj),0)
                     par_delta, cam_delta = updater_cam(cat_input)
+                    cam_delta = torch.zeros(cam_delta.shape[0],cam_delta.shape[1]).to(device)
                     cam_delta= torch.reshape(cam_delta,(args.num_views,batch))
                     cam_delta = torch.t(cam_delta)
                     new_cam = cam_delta+cam_update
@@ -631,7 +632,7 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         cam_delta_loss = 0 * cam_delta_loss
                         cam_delta_loss_abs = 0 * cam_delta_loss_abs
                     '''
-                    loss = loss + cam_delta_loss*args.cam_loss + shape_delta_loss*args.cam_loss
+                    loss = loss  + shape_delta_loss*args.cam_loss
                     # loss = loss + reproj_delta_loss[r]*0.001
 
                     # save update
@@ -651,6 +652,8 @@ def train_model(parent_dic, save_name, vis_title, device, predictor, updater_cam
                         for r in range(0,reproj_round):
                             cat_input = torch.cat((inputs,reprojections.clone().detach()),0)
                             par_delta, cam_delta = updater_cam(cat_input)
+                            cam_delta = torch.zeros(cam_delta.shape[0],cam_delta.shape[1]).to(device)
+
                             cam_delta= torch.reshape(cam_delta,(args.num_views,batch))
                             cam_delta = torch.t(cam_delta)
                             # new_cam = cam_delta+cam_prd
